@@ -18,7 +18,7 @@ The intention with DataScript is to be a basic building block in client-side app
 ## Latest version [![Build Status](https://travis-ci.org/tonsky/datascript.svg?branch=master)](https://travis-ci.org/tonsky/datascript)
 
 ```clj
-[datascript "1.0.1"]
+[datascript "1.2.0"]
 ```
 
 ## Support us
@@ -40,8 +40,10 @@ Docs:
 - API Docs [![cljdoc badge](https://cljdoc.org/badge/datascript/datascript)](https://cljdoc.org/d/datascript/datascript/CURRENT)
 - [Getting started](https://github.com/tonsky/datascript/wiki/Getting-started)
 - [Tutorials](https://github.com/kristianmandrup/datascript-tutorial)
-- [DataScript 101](http://udayv.com/clojurescript/clojure/2016/04/28/datascript101/)
+- [DataScript 101](https://udayv.com/blog/2016-04-28-datascript101/)
 - [Tips & tricks](https://github.com/tonsky/datascript/wiki/Tips-&-tricks)
+- [Triple Stores overview](https://github.com/threatgrid/asami/wiki/Introduction)
+- [Quick tutorial into Datalog](http://www.learndatalogtoday.org/)
 
 Posts:
 
@@ -60,12 +62,13 @@ Talks:
 Projects using DataScript:
 
 - [Roam Research](https://roamresearch.com/), a note-taking graph database
-- [Athens](https://github.com/athensresearch/athens), a tool for networked thought
-- [Precursor](http://precursorapp.com/), collaborative prototyping tool
-- [LightMesh](http://lightmesh.com/), datacenter management
+- [LogSeq](http://logseq.com), a local-first, non-linear, outliner notebook
+- [Athens Research](https://github.com/athensresearch/athens), a tool for networked thought
 - [Cognician](https://www.cognician.com/), coaching platform
+- [LightMesh](http://lightmesh.com/), datacenter management
 - [PartsBox](https://partsbox.io/), electronic parts management
 - [I am Fy](https://www.iamfy.co/), accessories e-shop
+- [Precursor](http://precursorapp.com/), collaborative prototyping tool
 - [Acha-acha](http://tonsky.me/blog/acha-acha/), GitHub achievements
 - [Showkr](http://showkr.solovyov.net), flickr gallery viewer ([sources](https://github.com/piranha/showkr))
 - [Zetawar](http://www.zetawar.com), turn-based tactical strategy game
@@ -161,7 +164,7 @@ For more examples, see [our acceptance test suite](test/datascript/test/).
 DataScript can be used from any JS engine without additional dependencies:
 
 ```html
-<script src="https://github.com/tonsky/datascript/releases/download/1.0.1/datascript-1.0.1.min.js"></script>
+<script src="https://github.com/tonsky/datascript/releases/download/1.2.0/datascript-1.2.0.min.js"></script>
 ```
 
 or as a CommonJS module ([npm page](https://www.npmjs.org/package/datascript)):
@@ -270,6 +273,6 @@ Some of the features are omitted intentionally. Different apps have different ne
 
 ## License
 
-Copyright © 2014–2020 Nikita Prokopov
+Copyright © 2014–2021 Nikita Prokopov
 
 Licensed under Eclipse Public License (see [LICENSE](LICENSE)).

@@ -1,3 +1,31 @@
+# 1.2.0
+
+- New namespace: `datascript.serialize`. Prepares database for fast to/from JSON serialization
+
+# 1.1.0
+
+- [ Breaking ] Remove `ISeqable` from `DB`/`FilteredDB` as it was breaking `keys` #393
+
+# 1.0.7
+
+- Ensure transitive property for hash value comparisons #274 #356 #386 #388 thx @filipesilva
+
+# 1.0.5
+
+- Fixed empty non-queried relation not affecting results #385
+
+# 1.0.4
+
+- Implement nav/datafy for entities #325 thx @IamDrowsy
+
+# 1.0.3
+
+- Temporary disable transient indices #373
+
+# 1.0.2
+
+- Fixed db diffs with different types of the same attribute #369 #372 thx @darkleaf
+
 # 1.0.1
 
 - Fixed upsert incorectly failing tempid check #363
@@ -378,7 +406,7 @@ Performance numbers so far ([raw data](https://gist.github.com/tonsky/9da339f871
 - Fixed a bug when cross-referencing components caused infinite loop in Pull API (isuue #58, pull request #61)
 - Pull API handles recursion more like Datomic does (issue #62)
 - Exposed DB filter API to js (pull request #65)
-- Added ICounted, ISequable, IEmptyableCollection to `datascript.core/DB`
+- Added ICounted, ISeqable, IEmptyableCollection to `datascript.core/DB`
 - Force put `Datom` and `DB` tag readers to `cljs.reader/*tag-table*`, do not rely on `data_readers.clj`
 
 # 0.9.0

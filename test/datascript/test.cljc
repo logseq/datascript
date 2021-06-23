@@ -34,12 +34,13 @@
     datascript.test.query-return-map
     datascript.test.query-rules
     datascript.test.query-v3
-    datascript.test.serialization
+    datascript.test.serialize
     datascript.test.transact
     datascript.test.tuples
     datascript.test.validation
     datascript.test.upsert
-    datascript.test.issues))
+    datascript.test.issues
+    datascript.test.datafy))
 
 (defn ^:export test-clj []
   (datascript.test.core/wrap-res #(t/run-all-tests #"datascript\..*")))

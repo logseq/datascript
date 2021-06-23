@@ -1,8 +1,11 @@
-#!/usr/bin/env clojure
+#!/usr/bin/env clj
 
-"USAGE: ./release.clj <new-version>"
+"USAGE: ./release.clj <new-version> [<commit-message>]"
 
 (def new-v (first *command-line-args*))
+(def commit-message (if-some [msg (second *command-line-args*)]
+                      (str new-v msg)
+                      (str "Version " new-v)))
 
 (assert (re-matches #"\d+\.\d+\.\d+" (or new-v "")) "Use ./release.clj <new-version>")
 (println "Releasing version" new-v)
@@ -19,11 +22,9 @@
 (defn current-version []
   (second (re-find #"def version \"([0-9\.]+)\"" (slurp "project.clj"))))
 
-(def ^:dynamic *env* {})
-
 (defn sh [& args]
-  (apply println "Running" (if (empty? *env*) "" (str :env " " *env*)) args)
-  (let [res (apply sh/sh (concat args [:env (merge (into {} (System/getenv)) *env*)]))]
+  (apply println "Running" args)
+  (let [res (apply sh/sh args)]
     (if (== 0 (:exit res))
       (do
         (println (:out res))
@@ -50,7 +51,8 @@
 (defn run-tests []
   (println "\n\n[ Running tests ]\n")
   (sh "lein" "test-clj")
-  (sh "lein" "cljsbuild" "once" "advanced" "release")
+  (sh "lein" "with-profile" "test" "cljsbuild" "once" "advanced")
+  (sh "lein" "cljsbuild" "once" "release")
   (sh "node" "test_node.js" "--all"))
 
 (defn make-commit []
@@ -62,7 +64,7 @@
       "release-js/package.json"
       "release-js/wrapper.prefix")
 
-  (sh "git" "commit" "-m" (str "Version " new-v))
+  (sh "git" "commit" "-m" commit-message)
   (sh "git" "tag" new-v)
   (sh "git" "push" "origin" "master"))
 
@@ -83,7 +85,7 @@
       (str/join ",\n"))
     " }"))
 
-(def GITHUB_AUTH (System/getenv "GITHUB_AUTH"))
+(def GITHUB_BASIC (System/getenv "GITHUB_BASIC"))
 
 (defn github-release []
   (sh "cp" "release-js/datascript.js" (str "release-js/datascript-" new-v ".min.js"))
@@ -98,12 +100,12 @@
                    "name"     new-v
                    "target_commitish" "master"
                    "body" changelog}
-        response (sh "curl" "-u" GITHUB_AUTH
+        response (sh "curl" "-u" GITHUB_BASIC
                      "-X" "POST"
                      "--data" (map->json request)
                      "https://api.github.com/repos/tonsky/datascript/releases")
         [_ id]    (re-find #"\"id\": (\d+)" response)]
-    (sh "curl" "-u" GITHUB_AUTH
+    (sh "curl" "-u" GITHUB_BASIC
                "-X" "POST"
                "-H" "Content-Type: application/javascript"
                "--data-binary" (str "@release-js/datascript-" new-v ".min.js")
@@ -116,8 +118,6 @@
   (make-commit)
   (publish-npm)
   (github-release)
-  (binding [*env* {"DATASCRIPT_CLASSIFIER" "-aot1.9"}]
-    (sh "lein" "with-profile" "+aot,+1.9" "deploy" "clojars"))
   (sh "lein" "deploy" "clojars")
   (System/exit 0))
 

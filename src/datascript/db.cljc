@@ -150,13 +150,17 @@
 
 (defprotocol IDatom
   (datom-tx [this])
-  (datom-added [this]))
+  (datom-added [this])
+  (datom-get-idx [this])
+  (datom-set-idx [this value]))
 
-(deftype Datom #?(:clj [^int e a v ^int tx ^:unsynchronized-mutable ^int _hash]
-                  :cljs [^number e a v ^number tx ^:mutable ^number _hash])
+(deftype Datom #?(:clj [^int e a v ^int tx ^:unsynchronized-mutable ^int idx ^:unsynchronized-mutable ^int _hash]
+                  :cljs [^number e a v ^number tx ^:mutable ^number idx ^:mutable ^number _hash])
   IDatom
   (datom-tx [d] (if (pos? tx) tx (- tx)))
   (datom-added [d] (pos? tx))
+  (datom-get-idx [_] idx)
+  (datom-set-idx [_ value] (set! idx (int value)))
 
   #?@(:cljs
        [IHash
@@ -224,9 +228,9 @@
 #?(:cljs (goog/exportSymbol "datascript.db.Datom" Datom))
 
 (defn ^Datom datom
-  ([e a v] (Datom. e a v tx0 0))
-  ([e a v tx] (Datom. e a v tx 0))
-  ([e a v tx added] (Datom. e a v (if added tx (- tx)) 0)))
+  ([e a v] (Datom. e a v tx0 0 0))
+  ([e a v tx] (Datom. e a v tx 0 0))
+  ([e a v tx added] (Datom. e a v (if added tx (- tx)) 0 0)))
 
 (defn datom? [x] (instance? Datom x))
 
@@ -332,15 +336,28 @@
     (if (nil? y) 0
       (compare x y))))
 
+(defn class-identical? [x y]
+  #?(:clj  (identical? (class x) (class y))
+     :cljs (identical? (type x) (type y))))
+
+(defn class-compare [x y]
+  #?(:clj  (compare (.getName (class x)) (.getName (class y)))
+     :cljs (garray/defaultCompare (type->str (type x)) (type->str (type y)))))
+
 (defn value-compare [x y]
-  (cond
-    (= x y) 0
-    #?@(:clj  [(instance? Number x)       (clojure.lang.Numbers/compare x y)])
-    #?@(:clj  [(instance? Comparable x)   (.compareTo ^Comparable x y)]
-        :cljs [(satisfies? IComparable x) (-compare x y)])
-    #?@(:cljs [(and (or (string? x) (array? x) (true? x) (false? x))
-                 (identical? (type x) (type y))) (garray/defaultCompare x y)])
-    :else (- (hash x) (hash y))))
+  (try 
+    (cond
+      (= x y) 0
+      #?@(:clj  [(instance? Number x)       (clojure.lang.Numbers/compare x y)])
+      #?@(:clj  [(instance? Comparable x)   (.compareTo ^Comparable x y)]
+          :cljs [(satisfies? IComparable x) (-compare x y)])
+      (not (class-identical? x y)) (class-compare x y)
+      #?@(:cljs [(or (string? x) (array? x) (true? x) (false? x)) (garray/defaultCompare x y)])
+      :else (- (hash x) (hash y)))
+    (catch #?(:clj ClassCastException :cljs js/Error) e
+      (if (not (class-identical? x y))
+        (class-compare x y)
+        (throw e)))))
 
 (defn value-cmp [x y]
   (cond 
@@ -422,11 +439,15 @@
       :else
       (let [first-a (first a)
             first-b (first b)
-            diff (cmp first-a first-b)]
+            diff (try
+                   (cmp first-a first-b)
+                   (catch #?(:clj ClassCastException :cljs js/Error) _
+                     :incomparable))]
         (cond
-          (== diff 0) (recur only-a                only-b                (conj both first-a) (next a) (next b))
-          (< diff 0)  (recur (conj only-a first-a) only-b                both                (next a) b)
-          (> diff 0)  (recur only-a                (conj only-b first-b) both                a        (next b)))))))
+          (= diff :incomparable) (recur (conj only-a first-a) (conj only-b first-b) both                (next a) (next b))
+          (== diff 0)            (recur only-a                only-b                (conj both first-a) (next a) (next b))
+          (< diff 0)             (recur (conj only-a first-a) only-b                both                (next a) b)
+          (> diff 0)             (recur only-a                (conj only-b first-b) both                a        (next b)))))))
 
 ;; ----------------------------------------------------------------------------
 
@@ -476,7 +497,6 @@
   #?@(:cljs
       [IHash                (-hash  [db]        (hash-db db))
        IEquiv               (-equiv [db other]  (equiv-db db other))
-       ISeqable             (-seq   [db]        (-seq  (.-eavt db)))
        IReversible          (-rseq  [db]        (-rseq (.-eavt db)))
        ICounted             (-count [db]        (count (.-eavt db)))
        IEmptyableCollection (-empty [db]        (with-meta (empty-db (.-schema db)) (meta db)))
@@ -488,7 +508,6 @@
       :clj
       [Object               (hashCode [db]      (hash-db db))
        clojure.lang.IHashEq (hasheq [db]        (hash-db db))
-       clojure.lang.Seqable (seq [db]           (seq eavt))
        clojure.lang.IPersistentCollection
                             (count [db]         (count eavt))
                             (equiv [db other]   (equiv-db db other))
@@ -580,7 +599,6 @@
   #?@(:cljs
       [IHash                (-hash  [db]        (hash-fdb db))
        IEquiv               (-equiv [db other]  (equiv-db db other))
-       ISeqable             (-seq   [db]        (seq (-datoms db :eavt [])))
        ICounted             (-count [db]        (count (-datoms db :eavt [])))
        IPrintWithWriter     (-pr-writer [db w opts] (pr-db db w opts))
 
@@ -603,8 +621,6 @@
                             (equiv [db o]       (equiv-db db o))
                             (cons [db [k v]]    (throw (UnsupportedOperationException. "cons is not supported on FilteredDB")))
                             (empty [db]         (throw (UnsupportedOperationException. "empty is not supported on FilteredDB")))
-
-       clojure.lang.Seqable (seq [db]           (seq (-datoms db :eavt [])))
 
        clojure.lang.ILookup (valAt [db k]       (throw (UnsupportedOperationException. "valAt/2 is not supported on FilteredDB")))
                             (valAt [db k nf]    (throw (UnsupportedOperationException. "valAt/3 is not supported on FilteredDB")))
@@ -1294,7 +1310,7 @@
     (raise "Bad transaction data " initial-es ", expected sequential collection"
            {:error :transact/syntax, :tx-data initial-es}))
   (let [initial-report' (-> initial-report
-                          (update :db-after transient))
+                          #_(update :db-after transient))
         has-tuples?     (not (empty? (-attrs-by (:db-after initial-report) :db.type/tuple)))
         initial-es'     (if has-tuples?
                           (interleave initial-es (repeat ::flush-tuples))
@@ -1307,7 +1323,7 @@
           (check-value-tempids)
           (update :tempids assoc :db/current-tx (current-tx report))
           (update :db-after update :max-tx inc)
-          (update :db-after persistent!))
+          #_(update :db-after persistent!))
 
         :let [[entity & entities] es]
 

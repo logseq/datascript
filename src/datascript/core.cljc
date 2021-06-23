@@ -5,6 +5,7 @@
     [datascript.db :as db #?@(:cljs [:refer [FilteredDB]])]
     #?(:clj [datascript.pprint])
     [datascript.pull-api :as dp]
+    [datascript.serialize :as ds]
     [datascript.query :as dq]
     [datascript.impl.entity :as de])
   #?(:clj
@@ -54,7 +55,7 @@
                  (:_ref (entity db 2)) ; => [{:db/id 1}]
                  (:ns/_ref (entity db 2)) ; => [{:db/id 1}]
              
-             Reverse reference lookup returns sequence of entities unless attribute is marked as `:db/component`:
+             Reverse reference lookup returns sequence of entities unless attribute is marked as `:db/isComponent`:
 
                  (:_component-ref (entity db 2)) ; => {:db/id 1}
 
@@ -190,6 +191,38 @@
              Used internally in db (de)serialization. See also [[datom]]."}
   init-db db/init-db)
 
+
+(def ^{:arglists '([db] [db opts])
+       :doc "Converts db into a data structure (not string!) that can be fed to serializer
+             of your choice (e.g. `js/JSON.stringify` in CLJS, `cheshire.core/generate-string`
+             or `jsonista.core/write-value-as-string` in CLJ).
+
+             On JVM, `serializable` holds a global lock that prevents any two serializations
+             to run in parallel (an implementation constraint, be aware).
+
+             Options:
+
+             `:freeze-fn` Non-primitive values will be serialized using this. Optional.
+             `pr-str` by default."}
+  serializable ds/serializable)
+
+
+(def ^{:arglists '([serializable] [serializable opts])
+       :doc "Creates db from a data structure (not string!) produced by serializable.
+
+             Opts:
+
+             `:thaw-fn` Non-primitive values will be deserialized using this.
+             Must match :freeze-fn from serializable. Optional. `clojure.edn/read-string`
+             by default."}
+  from-serializable ds/from-serializable)
+
+
+; Schema
+
+(def ^{:arglists '([db])
+       :doc "Returns a schema of a database."}
+  schema db/-schema)
 
 ; Filtered db
 
@@ -489,7 +522,7 @@
       (transact! conn [[:db/add -1 :friend 296]])
   
       ; create an entity and set multiple attributes (in a single transaction
-      ; equal tempids will be replaced with the same unused yet entid)
+      ; equal tempids will be replaced with the same yet unused entid)
       (transact! conn [[:db/add -1 :name \"Ivan\"]
                        [:db/add -1 :likes \"fries\"]
                        [:db/add -1 :likes \"pizza\"]
@@ -508,11 +541,11 @@
                         :name   \"Oleg\"
                         :likes  [\"fish\"]}])
 
-      ; ref attributes can be specified as nested map, that will create netsed entity as well
+      ; ref attributes can be specified as nested map, that will create nested entity as well
       (transact! conn [{:db/id  -1
                         :name   \"Oleg\"
                         :friend {:db/id -2
-                                 :name \"Sergey\"}])
+                                 :name \"Sergey\"}}])
                                  
       ; reverse attribute name can be used if you want created entity to become
       ; a value in another entity reference
@@ -524,7 +557,7 @@
                        {:db/id 296, :friend -1}])
       ; equivalent to
       (transact! conn [[:db/add  -1 :name   \"Oleg\"]
-                       {:db/add 296 :friend -1]])"
+                       [:db/add 296 :friend -1]])"
   ([conn tx-data] (transact! conn tx-data nil))
   ([conn tx-data tx-meta]
     {:pre [(conn? conn)]}

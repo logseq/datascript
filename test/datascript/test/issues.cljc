@@ -34,3 +34,18 @@
            filtered (ds/filter base (constantly true))]
        (t/is (= (with-out-str (clojure.pprint/pprint base))
                 (with-out-str (clojure.pprint/pprint filtered)))))))
+
+(deftest ^{:doc "Can't diff databases with different types of the same attribute"}
+  issue-369
+  (let [db1 (-> (ds/empty-db)
+                (ds/db-with [[:db/add 1 :attr :aa]]))
+        db2 (-> (ds/empty-db)
+                (ds/db-with [[:db/add 1 :attr "aa"]]))]
+    (t/is (= [[(ds/datom 1 :attr :aa)] [(ds/datom 1 :attr "aa")] nil]
+             (clojure.data/diff db1 db2)))))
+
+(deftest ^{:doc "Expose a schema as a part of the public API."}
+  issue-381
+  (let [schema {:aka {:db/cardinality :db.cardinality/many}}
+        db     (ds/empty-db schema)]
+    (t/is (= schema (ds/schema db)))))
