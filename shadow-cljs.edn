@@ -1,0 +1,14 @@
+;; shadow-cljs configuration
+{:deps true
+
+ :builds
+ {:test
+  {:target           :node-test
+   :output-to        "target/datascript.js"
+   :compiler-options {:infer-externs true}}
+  :library
+  {:target           :node-library
+   :output-to        "target/main.js"
+   ;; library is just to enable shadow-cljs to compile code located in `src`,
+   ;; looking for a better way to trigger it
+   :exports          {:listen datascript.core/create-conn}}}}

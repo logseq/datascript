@@ -27,10 +27,10 @@
        :doc "Retrieves an entity by its id from database. Entities are lazy map-like structures to navigate DataScript database content.
 
              For `eid` pass entity id or lookup attr:
-             
+
                  (entity db 1)
                  (entity db [:unique-attr :value])
-            
+
              If entity does not exist, `nil` is returned:
 
                  (entity db 100500) ; => nil
@@ -40,7 +40,7 @@
                  (entity db 1) ; => {:db/id 1}
 
              Entity attributes can be lazily accessed through key lookups:
-             
+
                  (:attr (entity db 1)) ; => :value
                  (get (entity db 1) :attr) ; => :value
 
@@ -57,13 +57,13 @@
 
                  (:_ref (entity db 2)) ; => [{:db/id 1}]
                  (:ns/_ref (entity db 2)) ; => [{:db/id 1}]
-             
+
              Reverse reference lookup returns sequence of entities unless attribute is marked as `:db/isComponent`:
 
                  (:_component-ref (entity db 2)) ; => {:db/id 1}
 
              Entity gotchas:
-               
+
              - Entities print as map, but are not exactly maps (they have compatible get interface though).
              - Entities are effectively immutable “views” into a particular version of a database.
              - Entities retain reference to the whole database.
@@ -134,7 +134,7 @@
     :doc "Executes a datalog query. See [docs.datomic.com/on-prem/query.html](https://docs.datomic.com/on-prem/query.html).
 
           Usage:
-          
+
           ```
           (q '[:find ?value
                :where [_ :likes ?value]]
@@ -147,17 +147,15 @@
 ; Creating DB
 
 (defn- maybe-adapt-storage [opts]
-  #?(:clj
-     (if-some [storage (:storage opts)]
-       (update opts :storage storage/make-storage-adapter opts)
-       opts)
-     :cljs opts))
+  (if-some [storage (:storage opts)]
+    (update opts :storage storage/make-storage-adapter opts)
+    opts))
 
 (defn ^DB empty-db
   "Creates an empty database with an optional schema.
 
    Usage:
-   
+
    ```
    (empty-db) ; => #datascript/DB {:schema {}, :datoms []}
 
@@ -165,9 +163,9 @@
    ; => #datascript/DB {:schema {:likes {:db/cardinality :db.cardinality/many}}
    ;                    :datoms []}
    ```
-   
+
    Options are:
-   
+
    :branching-factor <int>, default 512. B-tree max node length
    :ref-type         :strong | :soft | :weak, default :soft. How will nodes that are already
                      stored on disk be referenced. Soft or weak means they might be unloaded
@@ -251,7 +249,7 @@
 
 (defn filter
   "Returns a view over database that has same interface but only includes datoms for which the `(pred db datom)` is true. Can be applied multiple times.
-   
+
    Filtered DB gotchas:
 
    - All operations on filtered database are proxied to original DB, then filter pred is applied.
@@ -306,17 +304,17 @@
        ;     #datascript/Datom [1 :likes \"fries\"]
        ;     #datascript/Datom [1 :likes \"pizza\"]
        ;     #datascript/Datom [1 :name \"Ivan\"])
-  
+
        ; find all datoms for entity id == 1 and attribute == :likes (any values)
        ; sorted by value
        (datoms db :eavt 1 :likes)
        ; => (#datascript/Datom [1 :likes \"fries\"]
        ;     #datascript/Datom [1 :likes \"pizza\"])
-       
+
        ; find all datoms for entity id == 1, attribute == :likes and value == \"pizza\"
        (datoms db :eavt 1 :likes \"pizza\")
        ; => (#datascript/Datom [1 :likes \"pizza\"])
-  
+
        ; find all datoms for attribute == :likes (any entity ids and values)
        ; sorted by entity id, then value
        (datoms db :aevt :likes)
@@ -325,13 +323,13 @@
        ;     #datascript/Datom [2 :likes \"candy\"]
        ;     #datascript/Datom [2 :likes \"pie\"]
        ;     #datascript/Datom [2 :likes \"pizza\"])
-  
+
        ; find all datoms that have attribute == `:likes` and value == `\"pizza\"` (any entity id)
        ; `:likes` must be a unique attr, reference or marked as `:db/index true`
        (datoms db :avet :likes \"pizza\")
        ; => (#datascript/Datom [1 :likes \"pizza\"]
        ;     #datascript/Datom [2 :likes \"pizza\"])
-  
+
        ; find all datoms sorted by entity id, then attribute, then value
        (datoms db :eavt) ; => (...)
 
@@ -339,24 +337,24 @@
 
        ; get all values of :db.cardinality/many attribute
        (->> (datoms db :eavt eid attr) (map :v))
-  
+
        ; lookup entity ids by attribute value
        (->> (datoms db :avet attr value) (map :e))
-  
+
        ; find all entities with a specific attribute
        (->> (datoms db :aevt attr) (map :e))
-  
+
        ; find “singleton” entity by its attr
        (->> (datoms db :aevt attr) first :e)
-  
+
        ; find N entities with lowest attr value (e.g. 10 earliest posts)
        (->> (datoms db :avet attr) (take N))
-  
+
        ; find N entities with highest attr value (e.g. 10 latest posts)
        (->> (datoms db :avet attr) (reverse) (take N))
 
    Gotchas:
-   
+
    - Index lookup is usually more efficient than doing a query with a single clause.
    - Resulting iterator is calculated in constant time and small constant memory overhead.
    - Iterator supports efficient `first`, `next`, `reverse`, `seq` and is itself a sequence.
@@ -398,12 +396,12 @@
        ;     #datascript/Datom [2 :likes \"candy\"]
        ;     #datascript/Datom [2 :likes \"pie\"]
        ;     #datascript/Datom [2 :likes \"pizza\"])
-  
-       (seek-datoms db :eavt 2) 
+
+       (seek-datoms db :eavt 2)
        ; => (#datascript/Datom [2 :likes \"candy\"]
        ;     #datascript/Datom [2 :likes \"pie\"]
        ;     #datascript/Datom [2 :likes \"pizza\"])
-  
+
        ; no datom [2 :likes \"fish\"], so starts with one immediately following such in index
        (seek-datoms db :eavt 2 :likes \"fish\")
        ; => (#datascript/Datom [2 :likes \"pie\"]
@@ -424,11 +422,11 @@
 
 (defn index-range
   "Returns part of `:avet` index between `[_ attr start]` and `[_ attr end]` in AVET sort order.
-  
+
    Same properties as [[datoms]].
-   
+
    `attr` must be a reference, unique attribute or marked as `:db/index true`.
-   
+
    Usage:
 
        (index-range db :likes \"a\" \"zzzzzzzzz\")
@@ -437,13 +435,13 @@
        ;     #datascript/Datom [2 :likes \"pie\"]
        ;     #datascript/Datom [1 :likes \"pizza\"]
        ;     #datascript/Datom [2 :likes \"pizza\"])
-        
+
        (index-range db :likes \"egg\" \"pineapple\")
        ; => (#datascript/Datom [1 :likes \"fries\"]
        ;     #datascript/Datom [2 :likes \"pie\"])
-           
+
    Useful patterns:
-     
+
        ; find all entities with age in a specific range (inclusive)
        (->> (index-range db :age 18 60) (map :e))"
   [db attr start end]
@@ -467,7 +465,7 @@
   (if-some [storage (storage/storage db)]
     (do
       (storage/store db)
-      (atom db 
+      (atom db
         :meta {:listeners      (atom {})
                :tx-tail        (atom [])
                :db-last-stored (atom db)}))
@@ -489,9 +487,9 @@
    Connections are lightweight in-memory structures (~atoms) with direct support of transaction listeners ([[listen!]], [[unlisten!]]) and other handy DataScript APIs ([[transact!]], [[reset-conn!]], [[db]]).
 
    To access underlying immutable DB value, deref: `@conn`.
-   
+
    For list of options, see [[empty-db]].
-   
+
    If you specify `:storage` option, conn will be stored automatically after each transaction"
   ([]
    (conn-from-db (empty-db)))
@@ -500,47 +498,45 @@
   ([schema opts]
    (conn-from-db (empty-db schema opts))))
 
-#?(:clj
-   (defn restore-conn
-     "Lazy-load database from storage and make conn out of it.
+(defn restore-conn
+  "Lazy-load database from storage and make conn out of it.
       Returns nil if there’s no database yet in storage"
-     ([storage]
-      (restore-conn storage {}))
-     ([storage opts]
-      (when-some [[db tail] (storage/restore-impl storage opts)]
-        (atom (storage/db-with-tail db tail)
-          :meta {:listeners      (atom {})
-                 :tx-tail        (atom tail)
-                 :db-last-stored (atom db)})))))
+  ([storage]
+   (restore-conn storage {}))
+  ([storage opts]
+   (when-some [[db tail] (storage/restore-impl storage opts)]
+     (atom (storage/db-with-tail db tail)
+           :meta {:listeners      (atom {})
+                  :tx-tail        (atom tail)
+                  :db-last-stored (atom db)}))))
 
 (defn ^:no-doc -transact! [conn tx-data tx-meta]
   {:pre [(conn? conn)]}
   (let [*report (atom nil)]
     (swap! conn
-      (fn [db]
-        (let [r (with db tx-data tx-meta)]
-          (reset! *report r)
-          (:db-after r))))
-    #?(:clj
-       (when-some [storage (storage/storage @conn)]
-         (let [{db     :db-after
-                datoms :tx-data} @*report
-               settings (set/settings (:eavt db))
-               *tx-tail (:tx-tail (meta conn))
-               tx-tail' (swap! *tx-tail conj datoms)]
-           (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
+           (fn [db]
+             (let [r (with db tx-data tx-meta)]
+               (reset! *report r)
+               (:db-after r))))
+    (when-some [storage (storage/storage @conn)]
+      (let [{db     :db-after
+             datoms :tx-data} @*report
+            settings (set/settings (:eavt db))
+            *tx-tail (:tx-tail (meta conn))
+            tx-tail' (swap! *tx-tail conj datoms)]
+        (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
              ;; overflow tail
-             (do
-               (storage/store-impl! db (storage/storage-adapter db) false)
-               (reset! *tx-tail [])
-               (reset! (:db-last-stored (meta conn)) db))
+          (do
+            (storage/store-impl! db (storage/storage-adapter db) false)
+            (reset! *tx-tail [])
+            (reset! (:db-last-stored (meta conn)) db))
              ;; just update tail
-             (storage/store-tail db tx-tail')))))
+          (storage/store-tail db tx-tail'))))
     @*report))
 
 (defn transact!
   "Applies transaction the underlying database value and atomically updates connection reference to point to the result of that transaction, new db value.
-  
+
    Returns transaction report, a map:
 
        { :db-before ...       ; db value before transaction
@@ -550,55 +546,55 @@
          :tx-meta   tx-meta } ; the exact value you passed as `tx-meta`
 
   Note! `conn` will be updated in-place and is not returned from [[transact!]].
-  
+
   Usage:
 
       ; add a single datom to an existing entity (1)
       (transact! conn [[:db/add 1 :name \"Ivan\"]])
-  
+
       ; retract a single datom
       (transact! conn [[:db/retract 1 :name \"Ivan\"]])
-  
+
       ; retract single entity attribute
       (transact! conn [[:db.fn/retractAttribute 1 :name]])
-  
+
       ; ... or equivalently (since Datomic changed its API to support this):
       (transact! conn [[:db/retract 1 :name]])
-      
+
       ; retract all entity attributes (effectively deletes entity)
       (transact! conn [[:db.fn/retractEntity 1]])
-  
+
       ; create a new entity (`-1`, as any other negative value, is a tempid
       ; that will be replaced with DataScript to a next unused eid)
       (transact! conn [[:db/add -1 :name \"Ivan\"]])
-  
+
       ; check assigned id (here `*1` is a result returned from previous `transact!` call)
       (def report *1)
       (:tempids report) ; => {-1 296}
-  
+
       ; check actual datoms inserted
       (:tx-data report) ; => [#datascript/Datom [296 :name \"Ivan\"]]
-  
+
       ; tempid can also be a string
       (transact! conn [[:db/add \"ivan\" :name \"Ivan\"]])
       (:tempids *1) ; => {\"ivan\" 297}
-  
+
       ; reference another entity (must exist)
       (transact! conn [[:db/add -1 :friend 296]])
-  
+
       ; create an entity and set multiple attributes (in a single transaction
       ; equal tempids will be replaced with the same yet unused entid)
       (transact! conn [[:db/add -1 :name \"Ivan\"]
                        [:db/add -1 :likes \"fries\"]
                        [:db/add -1 :likes \"pizza\"]
                        [:db/add -1 :friend 296]])
-  
+
       ; create an entity and set multiple attributes (alternative map form)
       (transact! conn [{:db/id  -1
                         :name   \"Ivan\"
                         :likes  [\"fries\" \"pizza\"]
                         :friend 296}])
-      
+
       ; update an entity (alternative map form). Can’t retract attributes in
       ; map form. For cardinality many attrs, value (fish in this example)
       ; will be added to the list of existing values
@@ -611,7 +607,7 @@
                         :name   \"Oleg\"
                         :friend {:db/id -2
                                  :name \"Sergey\"}}])
-                                 
+
       ; reverse attribute name can be used if you want created entity to become
       ; a value in another entity reference
       (transact! conn [{:db/id  -1
@@ -640,17 +636,16 @@
           (db/db? db)]}
    (let [db-before @conn
          report    (db/map->TxReport
-                     {:db-before db-before
-                      :db-after  db
-                      :tx-data   (concat
-                                   (map #(assoc % :added false) (datoms db-before :eavt))
-                                   (datoms db :eavt))
-                      :tx-meta   tx-meta})]
-     #?(:clj
-        (when-some [storage (storage/storage db-before)]
-          (storage/store db)
-          (reset! (:tx-tail (meta conn)) [])
-          (reset! (:db-last-stored (meta conn)) db)))
+                    {:db-before db-before
+                     :db-after  db
+                     :tx-data   (concat
+                                 (map #(assoc % :added false) (datoms db-before :eavt))
+                                 (datoms db :eavt))
+                     :tx-meta   tx-meta})]
+     (when-some [storage (storage/storage db-before)]
+       (storage/store db)
+       (reset! (:tx-tail (meta conn)) [])
+       (reset! (:db-last-stored (meta conn)) db))
      (reset! conn db)
      (doseq [[_ callback] (some-> (:listeners (meta conn)) (deref))]
        (callback report))
@@ -660,11 +655,10 @@
   "Warning! Does not perform any validation or data conversion. Only change schema in a compatible way"
   {:pre [(conn? conn)]}
   (let [db (swap! conn db/with-schema schema)]
-    #?(:clj
-       (when-some [storage (storage/storage @conn)]
-         (storage/store-impl! db (storage/storage-adapter db) true)
-         (reset! (:tx-tail (meta conn)) [])
-         (reset! (:db-last-stored (meta conn)) db)))
+    (when-some [storage (storage/storage @conn)]
+      (storage/store-impl! db (storage/storage-adapter db) true)
+      (reset! (:tx-tail (meta conn)) [])
+      (reset! (:db-last-stored (meta conn)) db))
     db))
 
 (defn- atom? [a]
@@ -674,9 +668,9 @@
 (defn listen!
   "Listen for changes on the given connection. Whenever a transaction is applied to the database via [[transact!]], the callback is called
    with the transaction report. `key` is any opaque unique value.
-   
+
    Idempotent. Calling [[listen!]] with the same key twice will override old callback with the new value.
-   
+
    Returns the key under which this listener is registered. See also [[unlisten!]]."
   ([conn callback]
    (listen! conn (rand) callback))
@@ -714,7 +708,7 @@
 
 (defn tempid
   "Allocates and returns an unique temporary id (a negative integer). Ignores `part`. Returns `x` if it is specified.
-  
+
    Exists for Datomic API compatibility. Prefer using negative integers directly if possible."
   ([part]
    (if (= part :db.part/tx)
@@ -727,14 +721,14 @@
 
 (defn resolve-tempid
   "Does a lookup in tempids map, returning an entity id that tempid was resolved to.
-   
+
    Exists for Datomic API compatibility. Prefer using map lookup directly if possible."
   [_db tempids tempid]
   (get tempids tempid))
 
 (defn ^DB db
   "Returns the underlying immutable database value from a connection.
-   
+
    Exists for Datomic API compatibility. Prefer using `@conn` directly if possible."
   [conn]
   {:pre [(conn? conn)]}
@@ -742,7 +736,7 @@
 
 (defn transact
   "Same as [[transact!]], but returns an immediately realized future.
-  
+
    Exists for Datomic API compatibility. Prefer using [[transact!]] if possible."
   ([conn tx-data] (transact conn tx-data nil))
   ([conn tx-data tx-meta]
@@ -782,7 +776,7 @@
 
 (defn transact-async
   "In CLJ, calls [[transact!]] on a future thread pool, returning immediately.
-  
+
    In CLJS, just calls [[transact!]] and returns a realized future."
   ([conn tx-data] (transact-async conn tx-data nil))
   ([conn tx-data tx-meta]
@@ -794,7 +788,7 @@
 
 (def ^{:arglists '([] [msec])} squuid
   "Generates a UUID that grow with time. Such UUIDs will always go to the end  of the index and that will minimize insertions in the middle.
-  
+
    Consist of 64 bits of current UNIX timestamp (in seconds) and 64 random bits (2^64 different unique values per second)."
   util/squuid)
 
@@ -804,25 +798,22 @@
 
 
 ;; Storage
-#?(:clj
-   (def ^{:arglists '([db])} storage
-     "Returns IStorage used by DB instance"
-     storage/storage))
+(def ^{:arglists '([db])} storage
+  "Returns IStorage used by DB instance"
+  storage/storage)
 
-#?(:clj
-   (def ^{:arglists '([db] [db storage])} store
-     "Stores databases to provided storage. If database was created
+(def ^{:arglists '([db] [db storage])} store
+  "Stores databases to provided storage. If database was created
       with :storage option or restored from storage, use single-argument version.
-      
-      Subsequent stores are incremental, i.e. only newly added nodes will be actually stored.
-      
-      Storing already stored dbs into another storage is not supported (may change)."
-     storage/store))
 
-#?(:clj 
-   (def ^{:arglists '([storage] [storage opts])} restore
-     "Lazy-loads database from storage. Ultra-fast, fetches the rest as it’s needed"
-     storage/restore))
+      Subsequent stores are incremental, i.e. only newly added nodes will be actually stored.
+
+      Storing already stored dbs into another storage is not supported (may change)."
+  storage/store)
+
+(def ^{:arglists '([storage] [storage opts])} restore
+  "Lazy-loads database from storage. Ultra-fast, fetches the rest as it’s needed"
+  storage/restore)
 
 #?(:clj
    (defn addresses
@@ -840,16 +831,16 @@
 #?(:clj
    (def ^{:arglists '([dir] [dir opts])} file-storage
      "Default implementation that stores data in files in a dir.
-   
+
    Options are:
-   
+
    :freeze-fn :: (data)   -> String. A serialization function
    :thaw-fn   :: (String) -> data. A deserialization function
    :write-fn  :: (OutputStream data) -> void. Implement your own writer to FileOutputStream
    :read-fn   :: (InputStream) -> Object. Implement your own reader from FileInputStream
    :addr->filename-fn :: (UUID) -> String. Construct file name from address
    :filename->addr-fn :: (String) -> UUID. Reconstruct address from file name
-   
+
    All options are optional."
      storage/file-storage))
 

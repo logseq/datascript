@@ -1,0 +1,7 @@
+;; shadow-cljs configuration
+{:deps true
+
+ :builds
+ {:demo {:target :node-script
+         :output-to "target/demo.js"
+         :main demo.core/main}}}
