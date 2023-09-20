@@ -38,21 +38,22 @@
 
 (defrecord StorageAdapter [storage]
   set-protocol/IStorage
-  (store [^Node node]
+  (store [_ ^Node node]
     (let [addr (gen-addr)
-          keys (mapv serializable-datom (.keys node))
-          data (cond-> {:keys  keys}
+          keys (mapv serializable-datom (.-keys node))
+          data (cond-> {:keys keys}
                  (instance? Node node)
-                 (assoc :addresses (.addresses node)))]
+                 (assoc :addresses (.-addresses node)))]
       (vswap! *store-buffer* conj! [addr data])
       addr))
-  (restore [addr]
+  (restore [_ addr]
     (let [{:keys [keys addresses]} (-restore storage addr)
-          keys' (map (fn [[e a v tx]] (db/datom e a v tx)) keys)]
+          keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
+                     (arrays/into-array))]
       (if addresses
-        (Node. keys' addresses (arrays/make-array (count addresses)))
+        (Node. keys' (arrays/make-array (count addresses)) addresses)
         (Leaf. keys'))))
-  (accessed [address]
+  (accessed [_ address]
     ;; TODO:
     nil))
 
@@ -77,18 +78,27 @@
   (locking (:storage adapter)
     (remember-db db)
     (binding [*store-buffer* (volatile! (transient []))]
-      (let [eavt-addr (set/store (:eavt db) adapter)
-            aevt-addr (set/store (:aevt db) adapter)
-            avet-addr (set/store (:avet db) adapter)
+      (let [eavt-set (:eavt db)
+            aevt-set (:aevt db)
+            avet-set (:avet db)
+            eavt-addr (set/store eavt-set adapter)
+            aevt-addr (set/store aevt-set adapter)
+            avet-addr (set/store avet-set adapter)
             meta (merge
-                   {:schema   (:schema db)
-                    :max-eid  (:max-eid db)
-                    :max-tx   (:max-tx db)
-                    :eavt     eavt-addr
-                    :aevt     aevt-addr
-                    :avet     avet-addr
-                    :max-addr @*max-addr}
-                   (set/settings (:eavt db)))]
+                  {:schema   (:schema db)
+                   :max-eid  (:max-eid db)
+                   :max-tx   (:max-tx db)
+                   :eavt     eavt-addr
+                   :aevt     aevt-addr
+                   :avet     avet-addr
+                   :eavt-metadata {:count (.-cnt eavt-set)
+                                   :shift (.-shift eavt-set)}
+                   :aevt-metadata {:count (.-cnt aevt-set)
+                                   :shift (.-shift aevt-set)}
+                   :avet-metadata {:count (.-cnt avet-set)
+                                   :shift (.-shift avet-set)}
+                   :max-addr @*max-addr}
+                  (set/settings (:eavt db)))]
         (when (or force? (pos? (count @*store-buffer*)))
           (vswap! *store-buffer* conj! [root-addr meta])
           (vswap! *store-buffer* conj! [tail-addr []])
@@ -117,17 +127,18 @@
   (locking storage
     (when-some [root (-restore storage root-addr)]
       (let [tail    (-restore storage tail-addr)
-            {:keys [schema eavt aevt avet max-eid max-tx max-addr]} root
+            {:keys [schema eavt aevt avet max-eid max-tx max-addr
+                    eavt-metadata aevt-metadata avet-metadata]} root
             _       (vswap! *max-addr max max-addr)
             opts    (merge root opts)
             adapter (make-storage-adapter storage opts)
             db      (db/restore-db
-                      {:schema  schema
-                       :eavt    (set/restore-by db/cmp-datoms-eavt eavt adapter opts)
-                       :aevt    (set/restore-by db/cmp-datoms-aevt aevt adapter opts)
-                       :avet    (set/restore-by db/cmp-datoms-avet avet adapter opts)
-                       :max-eid max-eid
-                       :max-tx  max-tx})]
+                     {:schema  schema
+                      :eavt    (set/restore-by db/cmp-datoms-eavt eavt adapter (assoc opts :set-metadata eavt-metadata))
+                      :aevt    (set/restore-by db/cmp-datoms-aevt aevt adapter (assoc opts :set-metadata aevt-metadata))
+                      :avet    (set/restore-by db/cmp-datoms-avet avet adapter (assoc opts :set-metadata avet-metadata))
+                      :max-eid max-eid
+                      :max-tx  max-tx})]
         (remember-db db)
         [db (mapv #(mapv (fn [[e a v tx]] (db/datom e a v tx)) %) tail)]))))
 

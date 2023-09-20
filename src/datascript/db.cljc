@@ -669,35 +669,35 @@
        IReversible          (-rseq  [db]        (-rseq (.-eavt db)))
        ICounted             (-count [db]        (count (.-eavt db)))
        IEmptyableCollection (-empty [db]        (-> (restore-db
-                                                      {:schema  (.-schema db)
-                                                       :rschema (.-rschema db)
-                                                       :eavt    (empty (.-eavt db))
-                                                       :aevt    (empty (.-aevt db))
-                                                       :avet    (empty (.-avet db))})
-                                                  (with-meta (meta db))))
+                                                     {:schema  (.-schema db)
+                                                      :rschema (.-rschema db)
+                                                      :eavt    (empty (.-eavt db))
+                                                      :aevt    (empty (.-aevt db))
+                                                      :avet    (empty (.-avet db))})
+                                                    (with-meta (meta db))))
        IPrintWithWriter     (-pr-writer [db w opts] (pr-db db w opts))
        IEditableCollection  (-as-transient [db] (db-transient db))
        ITransientCollection (-conj! [db key] (throw (ex-info "datascript.DB/conj! is not supported" {})))
-                            (-persistent! [db] (db-persistent! db))]
+       (-persistent! [db] (db-persistent! db))]
 
       :clj
       [Object               (hashCode [db]      (hash-db db))
        clojure.lang.IHashEq (hasheq [db]        (hash-db db))
        clojure.lang.IPersistentCollection
-                            (count [db]         (count eavt))
-                            (equiv [db other]   (equiv-db db other))
+       (count [db]         (count eavt))
+       (equiv [db other]   (equiv-db db other))
        clojure.lang.IEditableCollection
-                            (empty [db]         (-> (restore-db
-                                                      {:schema  (.-schema db)
-                                                       :rschema (.-rschema db)
-                                                       :eavt    (empty (.-eavt db))
-                                                       :aevt    (empty (.-aevt db))
-                                                       :avet    (empty (.-avet db))})
-                                                  (with-meta (meta db))))
-                            (asTransient [db] (db-transient db))
+       (empty [db]         (-> (restore-db
+                                {:schema  (.-schema db)
+                                 :rschema (.-rschema db)
+                                 :eavt    (empty (.-eavt db))
+                                 :aevt    (empty (.-aevt db))
+                                 :avet    (empty (.-avet db))})
+                               (with-meta (meta db))))
+       (asTransient [db] (db-transient db))
        clojure.lang.ITransientCollection
-                            (conj [db key] (throw (ex-info "datascript.DB/conj! is not supported" {})))
-                            (persistent [db] (db-persistent! db))])
+       (conj [db key] (throw (ex-info "datascript.DB/conj! is not supported" {})))
+       (persistent [db] (db-persistent! db))])
 
   IDB
   (-schema [db] (.-schema db))
@@ -705,78 +705,78 @@
 
   ISearch
   (-search [db pattern]
-    (let [[e a v tx] pattern
-          eavt       (.-eavt db)
-          aevt       (.-aevt db)
-          avet       (.-avet db)
-          pred       #?(:clj  (vpred v)
-                        :cljs #(= v %))
-          multival?  (contains? (-attrs-by db :db.cardinality/many) a)]
-      (case-tree [e a (some? v) tx]
-        [(set/slice eavt (datom e a v tx) (datom e a v tx))                   ;; e a v tx
-         (set/slice eavt (datom e a v tx0) (datom e a v txmax))               ;; e a v _
-         (->> (set/slice eavt (datom e a nil tx0) (datom e a nil txmax))      ;; e a _ tx
-           (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
-         (set/slice eavt (datom e a nil tx0) (datom e a nil txmax))           ;; e a _ _
-         (->> (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))  ;; e _ v tx
-           (->Eduction (filter (fn [^Datom d] (and (pred (.-v d))
-                                                   (= tx (datom-tx d)))))))
-         (->> (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))  ;; e _ v _
-           (->Eduction (filter (fn [^Datom d] (pred (.-v d))))))
-         (->> (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))  ;; e _ _ tx
-           (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
-         (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))       ;; e _ _ _
-         (if (indexing? db a)                                                 ;; _ a v tx
-           (->> (set/slice avet (datom e0 a v tx0) (datom emax a v txmax))
-             (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
-           (->> (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))
-             (->Eduction (filter (fn [^Datom d] (and (pred (.-v d))
-                                                     (= tx (datom-tx d))))))))
-         (if (indexing? db a)                                                 ;; _ a v _
-           (set/slice avet (datom e0 a v tx0) (datom emax a v txmax))
-           (->> (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))
-             (->Eduction (filter (fn [^Datom d] (pred (.-v d)))))))
-         (->> (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))  ;; _ a _ tx
-           (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
-         (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))       ;; _ a _ _
-         (filter (fn [^Datom d] (and (pred (.-v d))
-                                  (= tx (datom-tx d)))) eavt)                 ;; _ _ v tx
-         (filter (fn [^Datom d] (pred (.-v d))) eavt)                         ;; _ _ v
-         (filter (fn [^Datom d] (= tx (datom-tx d))) eavt)                    ;; _ _ _ tx
-         eavt])))                                                             ;; _ _ _ _
+           (let [[e a v tx] pattern
+                 eavt       (.-eavt db)
+                 aevt       (.-aevt db)
+                 avet       (.-avet db)
+                 pred       #?(:clj  (vpred v)
+                               :cljs #(= v %))
+                 multival?  (contains? (-attrs-by db :db.cardinality/many) a)]
+             (case-tree [e a (some? v) tx]
+                        [(set/slice eavt (datom e a v tx) (datom e a v tx))                   ;; e a v tx
+                         (set/slice eavt (datom e a v tx0) (datom e a v txmax))               ;; e a v _
+                         (->> (set/slice eavt (datom e a nil tx0) (datom e a nil txmax))      ;; e a _ tx
+                              (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
+                         (set/slice eavt (datom e a nil tx0) (datom e a nil txmax))           ;; e a _ _
+                         (->> (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))  ;; e _ v tx
+                              (->Eduction (filter (fn [^Datom d] (and (pred (.-v d))
+                                                                      (= tx (datom-tx d)))))))
+                         (->> (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))  ;; e _ v _
+                              (->Eduction (filter (fn [^Datom d] (pred (.-v d))))))
+                         (->> (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))  ;; e _ _ tx
+                              (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
+                         (set/slice eavt (datom e nil nil tx0) (datom e nil nil txmax))       ;; e _ _ _
+                         (if (indexing? db a)                                                 ;; _ a v tx
+                           (->> (set/slice avet (datom e0 a v tx0) (datom emax a v txmax))
+                                (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
+                           (->> (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))
+                                (->Eduction (filter (fn [^Datom d] (and (pred (.-v d))
+                                                                        (= tx (datom-tx d))))))))
+                         (if (indexing? db a)                                                 ;; _ a v _
+                           (set/slice avet (datom e0 a v tx0) (datom emax a v txmax))
+                           (->> (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))
+                                (->Eduction (filter (fn [^Datom d] (pred (.-v d)))))))
+                         (->> (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))  ;; _ a _ tx
+                              (->Eduction (filter (fn [^Datom d] (= tx (datom-tx d))))))
+                         (set/slice aevt (datom e0 a nil tx0) (datom emax a nil txmax))       ;; _ a _ _
+                         (filter (fn [^Datom d] (and (pred (.-v d))
+                                                     (= tx (datom-tx d)))) eavt)                 ;; _ _ v tx
+                         (filter (fn [^Datom d] (pred (.-v d))) eavt)                         ;; _ _ v
+                         (filter (fn [^Datom d] (= tx (datom-tx d))) eavt)                    ;; _ _ _ tx
+                         eavt])))                                                             ;; _ _ _ _
 
   IIndexAccess
   (-datoms [db index c0 c1 c2 c3]
-    (validate-indexed db index c0 c1 c2 c3)
-    (set/slice (get db index)
-      (components->pattern db index c0 c1 c2 c3 e0 tx0)
-      (components->pattern db index c0 c1 c2 c3 emax txmax)))
+           (validate-indexed db index c0 c1 c2 c3)
+           (set/slice (get db index)
+                      (components->pattern db index c0 c1 c2 c3 e0 tx0)
+                      (components->pattern db index c0 c1 c2 c3 emax txmax)))
 
   (-seek-datoms [db index c0 c1 c2 c3]
-    (validate-indexed db index c0 c1 c2 c3)
-    (set/slice (get db index)
-      (components->pattern db index c0 c1 c2 c3 e0 tx0)
-      (datom emax nil nil txmax)))
+                (validate-indexed db index c0 c1 c2 c3)
+                (set/slice (get db index)
+                           (components->pattern db index c0 c1 c2 c3 e0 tx0)
+                           (datom emax nil nil txmax)))
 
   (-rseek-datoms [db index c0 c1 c2 c3]
-    (validate-indexed db index c0 c1 c2 c3)
-    (set/rslice (get db index)
-      (components->pattern db index c0 c1 c2 c3 emax txmax)
-      (datom e0 nil nil tx0)))
+                 (validate-indexed db index c0 c1 c2 c3)
+                 (set/rslice (get db index)
+                             (components->pattern db index c0 c1 c2 c3 emax txmax)
+                             (datom e0 nil nil tx0)))
 
   (-index-range [db attr start end]
-    (validate-indexed db :avet attr nil nil nil)
-    (validate-attr attr (list '-index-range 'db attr start end))
-    (set/slice (.-avet db)
-      (resolve-datom db nil attr start nil e0 tx0)
-      (resolve-datom db nil attr end nil emax txmax)))
+                (validate-indexed db :avet attr nil nil nil)
+                (validate-attr attr (list '-index-range 'db attr start end))
+                (set/slice (.-avet db)
+                           (resolve-datom db nil attr start nil e0 tx0)
+                           (resolve-datom db nil attr end nil emax txmax)))
 
   clojure.data/EqualityPartition
   (equality-partition [x] :datascript/db)
 
   clojure.data/Diff
   (diff-similar [a b]
-    (diff-sorted (:eavt a) (:eavt b) cmp-datoms-eav-quick)))
+                (diff-sorted (:eavt a) (:eavt b) cmp-datoms-eav-quick)))
 
 (defn db? [x]
   #?(:clj
