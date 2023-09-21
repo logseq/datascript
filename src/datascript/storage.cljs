@@ -2,7 +2,7 @@
   (:require
    [datascript.db :as db :refer [Datom]]
    [datascript.util :as util]
-   [me.tonsky.persistent-sorted-set.impl :refer [PersistentSortedSet Node Leaf]]
+   [me.tonsky.persistent-sorted-set.impl :refer [BTSet Node Leaf]]
    [me.tonsky.persistent-sorted-set.protocol :as set-protocol]
    [me.tonsky.persistent-sorted-set :as set]
    [me.tonsky.persistent-sorted-set.arrays :as arrays]))
@@ -62,7 +62,7 @@
 
 (defn storage-adapter ^StorageAdapter [db]
   (when db
-    (.-storage ^PersistentSortedSet (:eavt db))))
+    (.-storage ^BTSet (:eavt db))))
 
 (defn storage [db]
   (when-some [adapter (storage-adapter db)]
@@ -116,7 +116,7 @@
        (if (identical? current-storage storage)
          (store-impl! db adapter false)
          (throw (ex-info "Database is already stored with another IStorage" {:storage current-storage}))))
-     (let [settings (.-_settings ^PersistentSortedSet (:eavt db))
+     (let [settings (.-_settings ^BTSet (:eavt db))
            adapter  (StorageAdapter. storage)]
        (store-impl! db adapter false)))))
 
