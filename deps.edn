@@ -1,6 +1,5 @@
-{:deps {;; persistent-sorted-set/persistent-sorted-set {:mvn/version "0.3.0"}
-        persistent-sorted-set/persistent-sorted-set {:git/url "https://github.com/tiensonqin/persistent-sorted-set"
-                                                     :sha "e6719a40e8b7803733074a821913efa2013c52cd"}}
+{:deps {persistent-sorted-set/persistent-sorted-set {:git/url "https://github.com/tiensonqin/persistent-sorted-set"
+                                                     :sha "e6719a40e8b7803733074a821913efa2013c52cd"}
         thheller/shadow-cljs                  {:mvn/version "2.19.0"}}
 
  :aliases {:1.9 {:override-deps {org.clojure/clojure {:mvn/version "1.9.0"}}}
