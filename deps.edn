@@ -1,6 +1,5 @@
 {:deps {persistent-sorted-set/persistent-sorted-set {:git/url "https://github.com/tiensonqin/persistent-sorted-set"
-                                                     :sha "fc8402eee2f14b2f91360a56dd47d6ed336fb7a8"}
-        thheller/shadow-cljs                  {:mvn/version "2.19.0"}}
+                                                     :sha "f1aa6bdb6f4f1078cb21928d9a79925c2be3f03c"}}
 
  :aliases {:1.9 {:override-deps {org.clojure/clojure {:mvn/version "1.9.0"}}}
 
