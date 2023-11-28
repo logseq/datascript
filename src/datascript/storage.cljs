@@ -2,9 +2,8 @@
   (:require
    [datascript.db :as db :refer [Datom]]
    [datascript.util :as util]
-   [me.tonsky.persistent-sorted-set.impl :refer [BTSet Node Leaf]]
    [me.tonsky.persistent-sorted-set.protocol :as set-protocol]
-   [me.tonsky.persistent-sorted-set :as set]
+   [me.tonsky.persistent-sorted-set :as set :refer [BTSet Node Leaf]]
    [me.tonsky.persistent-sorted-set.arrays :as arrays]))
 
 (defprotocol IStorage
@@ -51,7 +50,8 @@
           keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
                      (arrays/into-array))]
       (if addresses
-        (Node. keys' (arrays/make-array (count addresses)) addresses)
+        (let [children (arrays/make-array (count addresses))]
+          (Node. keys' children addresses))
         (Leaf. keys'))))
   (accessed [_ address]
     ;; TODO:
