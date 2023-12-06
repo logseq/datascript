@@ -1,5 +1,5 @@
 {:deps {persistent-sorted-set/persistent-sorted-set {:git/url "https://github.com/logseq/persistent-sorted-set"
-                                                     :sha "f777ffd33473cfc12e8fd0c4f68812cdbe8a4c9a"}}
+                                                     :sha "647779d00fb0707403d92a874500cf30ad698266"}}
 
  :aliases {:1.9 {:override-deps {org.clojure/clojure {:mvn/version "1.9.0"}}}
 

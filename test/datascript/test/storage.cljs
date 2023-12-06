@@ -82,7 +82,7 @@
           (reset-stats storage)
           (let [db' (d/restore storage)]
             (count db')
-            (is (= 3 (count @(:*reads storage))))))
+            (is (= 2 (count @(:*reads storage))))))
 
         (testing "settings"
           (let [db' (d/restore storage)]
@@ -124,7 +124,7 @@
         (reset-stats storage)
         (let [db' (d/restore storage)]
           (= 1000 (count db'))
-          (is (= 68 (count @(:*reads storage))))))
+          (is (= 2 (count @(:*reads storage))))))
 
       (testing "incremental store"
         (reset-stats storage)
@@ -329,4 +329,4 @@
 
   (->> (:eavt db')
        (drop 5000)
-       (take 5000)))  
+       (take 5000)))
