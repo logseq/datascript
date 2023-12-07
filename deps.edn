@@ -14,11 +14,7 @@
             :main-opts ["-m" "shadow.cljs.devtools.cli"]}
 
            :test {:extra-paths ["test"]
-                  :extra-deps {;org.clojure/clojurescript  {:mvn/version "1.10.520"}
-                               org.clojure/clojure {:mvn/version "1.11.1"}
-                               org.clojure/clojurescript {:mvn/version "1.11.51"}
-                               com.google.javascript/closure-compiler-unshaded {:mvn/version "v20220502"}
-
+                  :extra-deps {org.clojure/clojurescript  {:mvn/version "1.11.51"}
                                metosin/jsonista           {:mvn/version "0.3.3"}
                                cheshire/cheshire          {:mvn/version "5.10.0"}
                                com.cognitect/transit-clj  {:mvn/version "1.0.324"}
