@@ -1,6 +1,5 @@
-(ns nbb-test-runner
+(ns node-test-runner
   (:require [cljs.test :as t]
-            ;; [nbb.core :as nbb]
             [datascript.test.query]
             [datascript.test.pull-api]
             [datascript.test.query-rules]
@@ -45,8 +44,4 @@
                'datascript.test.query-not
                'datascript.test.query-aggregates
                'datascript.test.query-or
-               ;; assertions in test-basics fails
                'datascript.test.storage))
-
-;; (when (= nbb/*file* (:file (meta #'init)))
-;;   (init))

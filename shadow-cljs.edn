@@ -6,7 +6,7 @@
   {:target           :node-test
    :output-to        "target/datascript.js"
    :compiler-options {:infer-externs true}
-   :main nbb-test-runner/init}
+   :main node-test-runner/init}
   :library
   {:target           :node-library
    :output-to        "target/main.js"
