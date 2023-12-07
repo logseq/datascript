@@ -104,10 +104,11 @@
           (is (= 2 (count @(:*reads storage)))) ;; read root + tail
 
           (is (= [1 :str "1"] (-> (d/datoms db' :eavt) first ((juxt :e :a :v)))))
-          (is (= 5 (count @(:*reads storage)))) ;; eavt root + 2 levels
+          ;; TODO: lazy compute the `till` path for set/-slice
+          (is (= 7 (count @(:*reads storage)))) ;; eavt root + 2 levels
 
           (first (d/datoms db' :eavt))
-          (is (= 5 (count @(:*reads storage)))) ;; second time no read
+          (is (= 7 (count @(:*reads storage)))) ;; second time no read
 
           (vec (d/datoms db' :eavt))
           (is (= 68 (count @(:*reads storage))))
