@@ -5,7 +5,8 @@
  {:test
   {:target           :node-test
    :output-to        "target/datascript.js"
-   :compiler-options {:infer-externs true}}
+   :compiler-options {:infer-externs true}
+   :main node-test-runner/init}
   :library
   {:target           :node-library
    :output-to        "target/main.js"
