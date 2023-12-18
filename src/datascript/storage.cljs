@@ -9,7 +9,7 @@
 (defprotocol IStorage
   ;; :extend-via-metadata true
 
-  (-store [_ addr+data-seq]
+  (-store [_ addr+data-seq delete-addrs]
     "Gives you a sequence of `[addr data]` pairs to serialize and store.
 
      `addr`s are 64 bit integers.
@@ -19,6 +19,7 @@
     "Read back and deserialize data stored under single `addr`"))
 
 (def ^:private ^:dynamic *store-buffer*)
+(def ^:private *delete-buffer (atom {}))
 
 (defn serializable-datom [^Datom d]
   [(.-e d) (.-a d) (.-v d) (.-tx d)])
@@ -46,16 +47,20 @@
       (vswap! *store-buffer* conj! [addr data])
       addr))
   (restore [_ addr]
-    (let [{:keys [keys addresses]} (-restore storage addr)
-          keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
-                     (arrays/into-array))]
-      (if addresses
-        (let [children (arrays/make-array (count addresses))]
-          (Node. keys' children addresses))
-        (Leaf. keys'))))
-  (accessed [_ address]
+    (let [{:keys [keys addresses]} (-restore storage addr)]
+      (when keys
+        (let [keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
+                         (arrays/into-array))]
+          (if addresses
+            (let [children (arrays/make-array (count addresses))]
+              (Node. keys' children addresses))
+            (Leaf. keys'))))))
+  (accessed [_ _addr]
     ;; TODO:
-    nil))
+    nil)
+
+  (delete [_ addr]
+    (swap! *delete-buffer update storage conj addr)))
 
 (defn make-storage-adapter [storage _opts]
   (StorageAdapter. storage))
@@ -102,7 +107,10 @@
         (when (or force? (pos? (count @*store-buffer*)))
           (vswap! *store-buffer* conj! [root-addr meta])
           (vswap! *store-buffer* conj! [tail-addr []])
-          (-store (:storage adapter) (persistent! @*store-buffer*)))
+          (let [storage (:storage adapter)
+                delete-addrs (get @*delete-buffer storage)
+                _ (swap! *delete-buffer assoc storage nil)]
+            (-store storage (persistent! @*store-buffer*) delete-addrs)))
         db))))
 
 (defn store
@@ -121,7 +129,7 @@
        (store-impl! db adapter false)))))
 
 (defn store-tail [db tail]
-  (-store (storage db) [[tail-addr (mapv #(mapv serializable-datom %) tail)]]))
+  (-store (storage db) [[tail-addr (mapv #(mapv serializable-datom %) tail)]] nil))
 
 (defn restore-impl [storage opts]
   (locking storage
