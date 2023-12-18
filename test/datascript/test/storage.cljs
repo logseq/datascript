@@ -10,7 +10,7 @@
 
 (defrecord Storage [*disk *reads *writes *deletes]
   storage/IStorage
-  (-store [_ addr+data-seq]
+  (-store [_ addr+data-seq _delete-addrs]
     (doseq [[addr data] addr+data-seq]
       (vswap! *disk assoc addr (pr-str data))
       (vswap! *writes conj addr)))
