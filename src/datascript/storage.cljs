@@ -38,8 +38,13 @@
 
 (defrecord StorageAdapter [storage]
   set-protocol/IStorage
-  (store [_ ^Node node]
-    (let [addr (gen-addr)
+  (store [_ ^Node node address]
+    (let [addr (cond
+                 (and address (instance? Node node)
+                      (contains? (set (.-addresses node)) address))
+                 (gen-addr)
+                 :else
+                 (or address (gen-addr)))
           keys (mapv serializable-datom (.-keys node))
           data (cond-> {:keys keys}
                  (instance? Node node)
@@ -50,11 +55,12 @@
     (let [{:keys [keys addresses]} (-restore storage addr)]
       (when keys
         (let [keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
-                         (arrays/into-array))]
+                         (arrays/into-array))
+              opts {:address addr :dirty? false}]
           (if addresses
             (let [children (arrays/make-array (count addresses))]
-              (Node. keys' children addresses))
-            (Leaf. keys'))))))
+              (set/new-node keys' children addresses opts))
+            (set/new-leaf keys' opts))))))
   (accessed [_ _addr]
     ;; TODO:
     nil)
