@@ -19,7 +19,10 @@
     "Read back and deserialize data stored under single `addr`"))
 
 (def ^:private ^:dynamic *store-buffer*)
+;; unused addresses
 (def ^:private *delete-buffer (atom {}))
+;; kept addresses
+(def ^:private *kept-buffer (atom {}))
 
 (defn serializable-datom [^Datom d]
   [(.-e d) (.-a d) (.-v d) (.-tx d)])
@@ -65,8 +68,13 @@
     ;; TODO:
     nil)
 
-  (delete [_ addr]
-    (swap! *delete-buffer update storage conj addr)))
+  (delete [_ unused-addresses kept-addresses]
+    (swap! *delete-buffer update storage
+           (fn [buffer]
+             (concat buffer (remove nil? unused-addresses))))
+    (swap! *kept-buffer update storage
+           (fn [buffer]
+             (concat buffer (remove nil? kept-addresses))))))
 
 (defn make-storage-adapter [storage _opts]
   (StorageAdapter. storage))
@@ -114,8 +122,11 @@
           (vswap! *store-buffer* conj! [root-addr meta])
           (vswap! *store-buffer* conj! [tail-addr []])
           (let [storage (:storage adapter)
-                delete-addrs (get @*delete-buffer storage)
-                _ (swap! *delete-buffer assoc storage nil)]
+                kept-addrs (set (get @*kept-buffer storage))
+                delete-addrs (->> (get @*delete-buffer storage)
+                                  (remove kept-addrs))
+                _ (swap! *delete-buffer assoc storage nil)
+                _ (swap! *kept-buffer assoc storage nil)]
             (-store storage (persistent! @*store-buffer*) delete-addrs)))
         db))))
 
