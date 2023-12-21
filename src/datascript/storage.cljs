@@ -21,8 +21,6 @@
 (def ^:private ^:dynamic *store-buffer*)
 ;; unused addresses
 (def ^:private *delete-buffer (atom {}))
-;; kept addresses
-(def ^:private *kept-buffer (atom {}))
 
 (defn serializable-datom [^Datom d]
   [(.-e d) (.-a d) (.-v d) (.-tx d)])
@@ -44,14 +42,14 @@
   (store [_ ^Node node address]
     (let [addr (cond
                  (and address (instance? Node node)
-                      (contains? (set (.-addresses node)) address))
+                      (contains? (set (.-_addresses node)) address))
                  (gen-addr)
                  :else
                  (or address (gen-addr)))
           keys (mapv serializable-datom (.-keys node))
           data (cond-> {:keys keys}
                  (instance? Node node)
-                 (assoc :addresses (.-addresses node)))]
+                 (assoc :addresses (.-_addresses node)))]
       (vswap! *store-buffer* conj! [addr data])
       addr))
   (restore [_ addr]
@@ -68,13 +66,10 @@
     ;; TODO:
     nil)
 
-  (delete [_ unused-addresses kept-addresses]
+  (delete [_ unused-addresses]
     (swap! *delete-buffer update storage
            (fn [buffer]
-             (concat buffer (remove nil? unused-addresses))))
-    (swap! *kept-buffer update storage
-           (fn [buffer]
-             (concat buffer (remove nil? kept-addresses))))))
+             (into buffer (remove nil? unused-addresses))))))
 
 (defn make-storage-adapter [storage _opts]
   (StorageAdapter. storage))
@@ -122,11 +117,9 @@
           (vswap! *store-buffer* conj! [root-addr meta])
           (vswap! *store-buffer* conj! [tail-addr []])
           (let [storage (:storage adapter)
-                kept-addrs (set (get @*kept-buffer storage))
                 delete-addrs (->> (get @*delete-buffer storage)
-                                  (remove kept-addrs))
-                _ (swap! *delete-buffer assoc storage nil)
-                _ (swap! *kept-buffer assoc storage nil)]
+                                  (distinct))
+                _ (swap! *delete-buffer assoc storage nil)]
             (-store storage (persistent! @*store-buffer*) delete-addrs)))
         db))))
 
