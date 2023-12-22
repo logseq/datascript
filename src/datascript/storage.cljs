@@ -57,7 +57,7 @@
       (when keys
         (let [keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
                          (arrays/into-array))
-              opts {:address addr :dirty? false}]
+              opts {:address addr :dirty false}]
           (if addresses
             (let [children (arrays/make-array (count addresses))]
               (set/new-node keys' children addresses opts))
