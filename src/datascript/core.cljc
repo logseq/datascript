@@ -520,13 +520,13 @@
              (let [r (with db tx-data tx-meta')]
                (reset! *report r)
                (:db-after r))))
-    (when skip-store?
-      (when-some [storage (storage/storage @conn)]
-        (let [{db     :db-after
-               datoms :tx-data} @*report
-              settings (set/settings (:eavt db))
-              *tx-tail (:tx-tail (meta conn))
-              tx-tail' (swap! *tx-tail conj datoms)]
+    (when-some [storage (storage/storage @conn)]
+      (let [{db     :db-after
+             datoms :tx-data} @*report
+            settings (set/settings (:eavt db))
+            *tx-tail (:tx-tail (meta conn))
+            tx-tail' (swap! *tx-tail conj datoms)]
+        (when-not skip-store?
           (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
              ;; overflow tail
             (do
