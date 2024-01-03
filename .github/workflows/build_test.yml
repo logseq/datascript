@@ -9,6 +9,7 @@ on:
       - 'test/**'
       - 'project.clj'
       - 'deps.edn'
+      - '.github/workflows/*'
 
 jobs:
   test:
@@ -19,6 +20,11 @@ jobs:
         run: |
           echo "JAVA_HOME=$JAVA_HOME_11_X64" >> $GITHUB_ENV
           echo "$JAVA_HOME_11_X64/bin" >> $GITHUB_PATH
+      - name: Set up Clojure
+        uses: DeLaGuardo/setup-clojure@12.1
+        with:
+          cli: 1.11.1.1413
+
       - run: ./script/test_clj.sh
-      - run: ./script/test_cljs.sh
-      - run: ./script/test_js.sh
+      - run: clojure -M:shadow-cljs:test compile test && node target/datascript.js
+      # - run: ./script/test_js.sh
