@@ -162,9 +162,13 @@
 
 (defn db-with-tail [db tail]
   (reduce
-    (fn [db datoms]
-      (reduce db/with-datom db datoms))
-    db tail))
+   (fn [db datoms]
+     (reduce (fn [db datom]
+               (try (db/with-datom db datom)
+                    (catch :default e
+                      (js/console.error e)
+                      db))) db datoms))
+   db tail))
 
 (defn restore
   ([storage]
