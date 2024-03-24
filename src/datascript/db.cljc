@@ -4,6 +4,7 @@
     [clojure.walk]
     [clojure.data]
     #?(:clj [datascript.inline :refer [update]])
+    [datascript.schema :as ds]
     [datascript.lru :as lru]
     [me.tonsky.persistent-sorted-set :as set]
     [me.tonsky.persistent-sorted-set.arrays :as arrays])
@@ -887,7 +888,7 @@
     {}
     (:db.type/tuple rschema)))
 
-(defn- rschema
+(defn- rschema [schema]
   ":db/unique           => #{attr ...}
    :db.unique/identity  => #{attr ...}
    :db.unique/value     => #{attr ...}
@@ -897,17 +898,18 @@
    :db/isComponent      => #{attr ...}
    :db.type/tuple       => #{attr ...}
    :db/attrTuples       => {attr => {tuple-attr => idx}}"
-  [schema]
   (let [rschema (reduce-kv
-                  (fn [rschema attr attr-schema]
-                    (reduce-kv
-                      (fn [rschema key value]
+                 (fn [m attr keys->values]
+                   (if (keyword? keys->values)
+                     m
+                     (reduce-kv
+                      (fn [m key value]
                         (reduce
-                          (fn [rschema prop]
-                            (update rschema prop conjs attr))
-                          rschema (attr->properties key value)))
-                      rschema attr-schema))
-                  {} schema)]
+                         (fn [m prop]
+                           (assoc m prop (conj (get m prop #{}) attr)))
+                         m (attr->properties key value)))
+                      (update m :db/ident (fn [coll] (if coll (conj coll attr) #{attr}))) keys->values)))
+                 {} schema)]
     (assoc rschema :db/attrTuples (attr-tuples schema rschema))))
 
 (defn- validate-schema-key [a k v expected]
@@ -1271,25 +1273,76 @@
       true
       (update :db-after advance-max-eid eid))))
 
+(defn remove-schema [db ^Datom datom]
+  (let [schema (:schema db)
+        e (.-e datom)
+        a (.-a datom)
+        v (.-v datom)
+        a-ident a
+        v-ident v]
+    (if (= a-ident :db/ident)
+      (if-not (schema v-ident)
+        (let [err-msg (str "Schema with attribute " v-ident " does not exist")
+              err-map {:error :retract/schema :attribute v-ident}]
+          (throw #?(:clj (ex-info err-msg err-map)
+                    :cljs (error err-msg err-map))))
+        (-> (assoc-in db [:schema e] (dissoc (schema v-ident) a-ident))
+            (update-in [:schema] #(dissoc % v-ident))
+            (update-in [:ident-ref-map] #(dissoc % v-ident))
+            (update-in [:ref-ident-map] #(dissoc % e))))
+      (if-let [schema-entry (schema e)]
+        (if (schema schema-entry)
+          (update-in db [:schema schema-entry] #(dissoc % a-ident))
+          (update-in db [:schema e] #(dissoc % a-ident v-ident)))
+        (let [err-msg (str "Schema with entity id " e " does not exist")
+              err-map {:error :retract/schema :entity-id e :attribute a :value e}]
+          (throw #?(:clj (ex-info err-msg err-map)
+                    :cljs (error err-msg err-map))))))))
+
+(defn get-schema [db]
+  (or (:schema db) {}))
+
+(defn update-schema [db ^Datom datom]
+  (let [schema (get-schema db)
+        e (.-e datom)
+        a (.-a datom)
+        v (.-v datom)
+        a-ident a
+        v-ident v]
+    (if (= a-ident :db/ident)
+      (if (schema v-ident)
+        (raise (str "Schema with attribute " v-ident " already exists")
+               {:error :transact/schema :attribute v-ident})
+        (assoc-in db [:schema v-ident a-ident] v-ident))
+      (let [e-ident (:v (first (-seek-datoms db :eavt e :db/ident nil nil)))]
+        (assoc-in db [:schema e-ident a-ident] v-ident)))))
+
+(defn update-rschema [db]
+  (assoc db :rschema (rschema (get-schema db))))
+
 ;; In context of `with-datom` we can use faster comparators which
 ;; do not check for nil (~10-15% performance gain in `transact`)
 
 (defn with-datom [db ^Datom datom]
   (validate-datom db datom)
-  (let [indexing? (indexing? db (.-a datom))]
+  (let [indexing? (indexing? db (.-a datom))
+        schema? (ds/schema-attr? (.-a datom))]
     (if (datom-added datom)
       (cond-> db
         true      (update :eavt set/conj datom cmp-datoms-eavt-quick)
         true      (update :aevt set/conj datom cmp-datoms-aevt-quick)
         indexing? (update :avet set/conj datom cmp-datoms-avet-quick)
         true      (advance-max-eid (.-e datom))
-        true      (assoc :hash (atom 0)))
+        true      (assoc :hash (atom 0))
+        schema?   (-> (update-schema datom)
+                      update-rschema))
       (if-some [removing (fsearch db [(.-e datom) (.-a datom) (.-v datom)])]
         (cond-> db
           true      (update :eavt set/disj removing cmp-datoms-eavt-quick)
           true      (update :aevt set/disj removing cmp-datoms-aevt-quick)
           indexing? (update :avet set/disj removing cmp-datoms-avet-quick)
-          true      (assoc :hash (atom 0)))
+          true      (assoc :hash (atom 0))
+          schema?   (-> (remove-schema datom) update-rschema))
         db))))
 
 (defn- queue-tuple [queue tuple idx db e a v]
