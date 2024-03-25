@@ -1318,7 +1318,7 @@
         (assoc-in db [:schema e-ident a-ident] v-ident)))))
 
 (defn update-rschema [db]
-  (assoc db :rschema (rschema (get-schema db))))
+  (assoc db :rschema (rschema (merge implicit-schema (get-schema db)))))
 
 ;; In context of `with-datom` we can use faster comparators which
 ;; do not check for nil (~10-15% performance gain in `transact`)
@@ -1615,6 +1615,17 @@
                {:error :transact/syntax, :tempids unused})))
     (dissoc report ::value-tempids ::tx-redundant)))
 
+(defn check-schema-update [db entity]
+  (when (ds/schema-entity? entity)
+    (when (and (contains? entity :db/ident)
+               (ds/is-system-keyword? (:db/ident entity)))
+      (raise "Using namespace 'db' for attribute identifiers is not allowed"
+             {:error :transact/schema :entity entity}))
+    (when (or (:db/cardinality entity) (:db/valueType entity))
+      (when-not (ds/schema? entity)
+        (raise "Incomplete schema transaction attributes, expected :db/ident, :db/cardinality"
+               {:error :transact/schema :entity entity})))))
+
 (defn+ transact-tx-data [initial-report initial-es]
   (when-not (or (nil? initial-es)
                 (sequential? initial-es))
@@ -1653,6 +1664,7 @@
 
         (map? entity)
         (let [old-eid (:db/id entity)]
+          (check-schema-update db entity)
           (cond+
             ;; trivial entity
             ; (if (contains? entity :db/id)
