@@ -1284,8 +1284,7 @@
       (if-not (schema v-ident)
         (let [err-msg (str "Schema with attribute " v-ident " does not exist")
               err-map {:error :retract/schema :attribute v-ident}]
-          (throw #?(:clj (ex-info err-msg err-map)
-                    :cljs (error err-msg err-map))))
+          (throw (ex-info err-msg err-map)))
         (-> (assoc-in db [:schema e] (dissoc (schema v-ident) a-ident))
             (update-in [:schema] #(dissoc % v-ident))
             (update-in [:ident-ref-map] #(dissoc % v-ident))
@@ -1297,7 +1296,7 @@
         (let [err-msg (str "Schema with entity id " e " does not exist")
               err-map {:error :retract/schema :entity-id e :attribute a :value e}]
           (throw #?(:clj (ex-info err-msg err-map)
-                    :cljs (error err-msg err-map))))))))
+                    :cljs (ex-info err-msg err-map))))))))
 
 (defn get-schema [db]
   (or (:schema db) {}))
