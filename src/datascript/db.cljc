@@ -1309,10 +1309,7 @@
         a-ident a
         v-ident v]
     (if (= a-ident :db/ident)
-      (if (schema v-ident)
-        (raise (str "Schema with attribute " v-ident " already exists")
-               {:error :transact/schema :attribute v-ident})
-        (assoc-in db [:schema v-ident a-ident] v-ident))
+      (assoc-in db [:schema v-ident a-ident] v-ident)
       (let [e-ident (:v (first (-seek-datoms db :eavt e :db/ident nil nil)))]
         (assoc-in db [:schema e-ident a-ident] v-ident)))))
 
