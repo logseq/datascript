@@ -19,3 +19,12 @@
 
 (defn schema-entity? [entity]
   (some #(contains? entity %) schema-keys))
+
+(def type?
+  #{:db.type/number
+    :db.type/instant
+    :db.type/keyword
+    :db.type/ref
+    :db.type/string
+    :db.type/uuid
+    :db.type/tuple})

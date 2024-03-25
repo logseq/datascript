@@ -934,7 +934,7 @@
            :key       :db/isComponent})))
 
     (validate-schema-key a :db/unique (:db/unique kv) #{:db.unique/value :db.unique/identity})
-    (validate-schema-key a :db/valueType (:db/valueType kv) #{:db.type/ref :db.type/tuple})
+    (validate-schema-key a :db/valueType (:db/valueType kv) ds/type?)
     (validate-schema-key a :db/cardinality (:db/cardinality kv) #{:db.cardinality/one :db.cardinality/many})
 
     ;; tuple should have tupleAttrs
