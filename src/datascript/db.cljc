@@ -1299,6 +1299,13 @@
 (defn get-schema [db]
   (or (:schema db) {}))
 
+(defn- get-e-schema
+  [schema e db-ident]
+  (let [result (schema e)]
+    (if (keyword? result)
+      (schema db-ident)
+      result)))
+
 (defn update-schema [db ^Datom datom]
   (let [schema (get-schema db)
         e (.-e datom)
@@ -1308,7 +1315,7 @@
         v-ident v]
     (if (= a-ident :db/ident)
       (-> db
-          (assoc-in [:schema v-ident] (merge (or (schema e) {}) (hash-map a-ident v-ident)))
+          (assoc-in [:schema v-ident] (merge (or (get-e-schema schema e v-ident) {}) (hash-map a-ident v-ident)))
           (assoc-in [:schema e] v-ident))
       (if-let [schema-entry (schema e)]
         (if (schema schema-entry)
