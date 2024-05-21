@@ -1301,10 +1301,11 @@
 
 (defn- get-e-schema
   [schema e db-ident]
-  (let [result (schema e)]
-    (if (keyword? result)
-      (schema db-ident)
-      result)))
+  (let [result (schema e)
+        s (schema db-ident)]
+    (if (map? result)
+      (merge result s)
+      s)))
 
 (defn update-schema [db ^Datom datom]
   (let [schema (get-schema db)
