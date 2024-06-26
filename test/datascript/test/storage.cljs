@@ -280,9 +280,7 @@
 
       ;; overflow keeps working on restored conn
       (d/transact! conn' (mapv #(vector :db/add % :name (str %)) (range 36 80)))
-      ;; (is (= 28 (count @(:*writes storage))))
-      ;; FIXME: clj version is 28
-      (is (= 29 (count @(:*writes storage))))
+      (is (= 28 (count @(:*writes storage))))
       (is (= @#'storage/tail-addr (last @(:*writes storage))))
 
       ;; restore conn without tail
@@ -290,7 +288,7 @@
         (is (= @conn' @conn''))
 
         (d/transact! conn'' [[:db/add 80 :name "Ilya"]])
-        (is (= 30 (count @(:*writes storage))))
+        (is (= 29 (count @(:*writes storage))))
         (is (= @#'storage/tail-addr (last @(:*writes storage))))
 
         ;; gc on conn
