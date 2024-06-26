@@ -1,16 +1,16 @@
 (ns ^:no-doc datascript.pull-api
   (:require
-   [clojure.string :as str]
-   [datascript.pull-parser :as dpp]
-   #?(:clj  [datascript.db :as db :refer [cond+]]
-      :cljs [datascript.db :as db :refer [DB] :refer-macros [cond+]])
-   [datascript.lru :as lru]
-   [me.tonsky.persistent-sorted-set :as set])
+    [clojure.string :as str]
+    [datascript.pull-parser :as dpp]
+    [datascript.db :as db #?@(:cljs [:refer [DB]])]
+    [datascript.lru :as lru]
+    [datascript.util :as util]
+    [me.tonsky.persistent-sorted-set :as set])
   #?(:clj
      (:import
-      [clojure.lang ISeq]
-      [datascript.db Datom DB]
-      [datascript.pull_parser PullAttr PullPattern])))
+       [clojure.lang ISeq]
+       [datascript.db Datom DB]
+       [datascript.pull_parser PullAttr PullPattern])))
 
 (declare pull-impl attrs-frame ref-frame ->ReverseAttrsFrame)
 
@@ -59,11 +59,11 @@
   (-run [this context]
     (loop [acc acc
            datoms datoms]
-      (cond+
+      (util/cond+
         :let [^Datom datom (first-seq datoms)]
 
         (or (nil? datom) (not= (.-a datom) (.-name attr)))
-        [(ResultFrame. ((.-xform attr) (not-empty (persistent! acc))) (or datoms ()))]
+        [(ResultFrame. (not-empty (persistent! acc)) (or datoms ()))]
 
         ; got limit, skip rest of the datoms
         (and (.-limit attr) (>= (count acc) (.-limit attr)))
@@ -91,11 +91,11 @@
       (next-seq datoms)))
   
   (-run [this context]
-    (cond+
+    (util/cond+
       :let [^Datom datom (first-seq datoms)]
 
       (or (nil? datom) (not= (.-a datom) (.-name attr)))
-      [(ResultFrame. ((.-xform attr) (not-empty (persistent! acc))) (or datoms ()))]
+      [(ResultFrame. (not-empty (persistent! acc)) (or datoms ()))]
 
       ; got limit, skip rest of the datoms
       (and (.-limit attr) (>= (count acc) (.-limit attr)))
@@ -119,7 +119,7 @@
     (AttrsFrame.
       seen
       recursion-limits
-      (assoc-some! acc (.-as attr) (.-value ^ResultFrame result))
+      (assoc-some! acc (.-as attr) ((.-xform attr) (.-value ^ResultFrame result)))
       pattern
       (first-seq attrs)
       (next-seq attrs)
@@ -130,7 +130,7 @@
            attr   attr
            attrs  attrs
            datoms datoms]
-      (cond+
+      (util/cond+
         ;; exit
         (and (nil? datoms) (nil? attr))
         [(->ReverseAttrsFrame seen recursion-limits acc pattern (first-seq (.-reverse-attrs pattern)) (next-seq (.-reverse-attrs pattern)) id)]
@@ -202,7 +202,7 @@
     (ReverseAttrsFrame.
       seen
       recursion-limits
-      (assoc-some! acc (.-as attr) (.-value ^ResultFrame result))
+      (assoc-some! acc (.-as attr) ((.-xform attr) (.-value ^ResultFrame result)))
       pattern
       (first-seq attrs)
       (next-seq attrs)
@@ -212,7 +212,7 @@
     (loop [acc   acc
            attr  attr
            attrs attrs]
-      (cond+
+      (util/cond+
         (nil? attr)
         [(ResultFrame. (not-empty (persistent! acc)) nil)]
 
@@ -249,7 +249,7 @@
       (.-wildcard? ^PullPattern (.-pattern attr)))))
 
 (defn ref-frame [context seen recursion-limits pattern ^PullAttr attr id]
-  (cond+
+  (util/cond+
     (not (auto-expanding? attr))
     (attrs-frame context seen recursion-limits (.-pattern attr) id)
 
@@ -270,10 +270,9 @@
     :else
     (attrs-frame context seen' recursion-limits' (if (.-recursive? attr) pattern (.-pattern attr)) id)))
 
-
 (defn attrs-frame [^Context context seen recursion-limits ^PullPattern pattern id]
   (let [db (.-db context)
-        datoms (cond+
+        datoms (util/cond+
                  (and (.-wildcard? pattern) (instance? DB db))
                  (set/slice (.-eavt ^DB db) (db/datom id nil nil db/tx0) (db/datom id nil nil db/txmax))
                  
@@ -291,11 +290,11 @@
 
                  :else
                  (->> (db/-seek-datoms db :eavt id nil nil nil))
-                   (take-while
-                     (fn [^Datom d]
-                       (and
-                         (= (.-e d) id)
-                         (<= (compare (.-a d) to) 0)))))]
+                 (take-while
+                   (fn [^Datom d]
+                     (and
+                       (= (.-e d) id)
+                       (<= (compare (.-a d) to) 0)))))]
     (when (.-wildcard? pattern)
       (visit context :db.pull/wildcard id nil nil))
     (AttrsFrame.
@@ -313,7 +312,7 @@
          ^PullPattern pattern :pattern} parsed-opts]
     (when-some [eid (db/entid (.-db context) id)]
       (loop [stack (list (attrs-frame context #{} {} pattern eid))]
-        (cond+
+        (util/cond+
           :let [last   (first-seq stack)
                 stack' (next-seq stack)]
 
@@ -355,26 +354,3 @@
    {:pre [(db/db? db)]}
    (let [parsed-opts (parse-opts db pattern opts)]
      (mapv #(pull-impl parsed-opts %) ids))))
-
-(comment
-  (do
-    (set! *warn-on-reflection* true)
-    (require 'datascript.test :reload-all)
-    (binding [clojure.test/*report-counters* (ref clojure.test/*initial-report-counters*)]
-      (clojure.test/test-vars
-        [#'datascript.test.pull-parser/test-parse-pattern
-         #'datascript.test.pull-api/test-pull-attr-spec
-         #'datascript.test.pull-api/test-pull-reverse-attr-spec
-         #'datascript.test.pull-api/test-pull-component-attr
-         #'datascript.test.pull-api/test-pull-wildcard
-         #'datascript.test.pull-api/test-pull-limit
-         #'datascript.test.pull-api/test-pull-default
-         #'datascript.test.pull-api/test-pull-as
-         #'datascript.test.pull-api/test-pull-attr-with-opts
-         #'datascript.test.pull-api/test-pull-map
-         #'datascript.test.pull-api/test-pull-recursion
-         #'datascript.test.pull-api/test-dual-recursion
-         #'datascript.test.pull-api/test-deep-recursion
-         #'datascript.test.pull-api/test-lookup-ref-pull
-         ])
-      @clojure.test/*report-counters*)))

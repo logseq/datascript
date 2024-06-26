@@ -18,7 +18,12 @@ The intention with DataScript is to be a basic building block in client-side app
 ## Latest version [![Build Status](https://travis-ci.org/tonsky/datascript.svg?branch=master)](https://travis-ci.org/tonsky/datascript)
 
 ```clj
-[datascript "1.5.3"]
+;; lein
+[datascript "1.7.1"]
+```
+```clj
+;; deps.edn
+datascript/datascript {:mvn/version "1.7.1"}
 ```
 
 Important! If you are using shadow-cljs, add
@@ -79,6 +84,7 @@ Projects using DataScript:
 - [LightMesh](http://lightmesh.com/), datacenter management
 - [PartsBox](https://partsbox.io/), electronic parts management
 - [I am Fy](https://www.iamfy.co/), accessories e-shop
+- [Under Whose Command?](https://myanmar.securityforcemonitor.org/), an interactive report by Security Force Monitor
 - [Pinfigurator](https://kevinlynagh.com/pinfigurator/), a microcontroller search tool
 - [Precursor](http://precursorapp.com/), collaborative prototyping tool
 - [Acha-acha](http://tonsky.me/blog/acha-acha/), GitHub achievements
@@ -177,7 +183,7 @@ For more examples, see [our acceptance test suite](test/datascript/test/).
 DataScript can be used from any JS engine without additional dependencies:
 
 ```html
-<script src="https://github.com/tonsky/datascript/releases/download/1.5.3/datascript-1.5.3.min.js"></script>
+<script src="https://github.com/tonsky/datascript/releases/download/1.7.1/datascript-1.7.1.min.js"></script>
 ```
 
 or as a CommonJS module ([npm page](https://www.npmjs.org/package/datascript)):
@@ -259,11 +265,7 @@ Interface differences:
 * Custom aggregate functions are called via aggregate keyword: `:find (aggregate ?myfn ?e) :in $ ?myfn`
 * Additional `:db.fn/retractAttribute` shortcut
 * Transactions are not annotated by default with `:db/txInstant`
-
-Expected soon:
-
-* Better error reporting
-* Proper documentation
+* When “transaction function” is called, the db that this function receive is a “partial db” relative to it's position in transaction.
 
 ## Differences from Datomic
 
@@ -272,13 +274,10 @@ Expected soon:
 * Simplified schema, not queryable
 * Attributes do not have to be declared in advance. Put them to schema only when you need special behaviour from them
 * Any type can be used for values
-* No `:db/ident` attributes, keywords are _literally_ attribute values, no integer id behind them
+* No `:db/ident` for attributes, keywords are _literally_ attribute values, no integer id behind them
 * No schema migrations
-* No cache segments management, no laziness. Entire DB must reside in memory
-* No facilities to persist, transfer over the wire or sync DB with the server
-* No pluggable storage options, no full-text search, no partitions
+* No full-text search, no partitions
 * No external dependencies
-* Free
 
 Aimed at interactive, long-living browser applications, DataScript DBs operate in constant space. If you do not add new entities, just update existing ones, or clean up database from time to time, memory consumption will be limited. This is unlike Datomic which keeps history of all changes, thus grows monotonically. DataScript does not track history by default, but you can do it via your own code if needed.
 
@@ -319,6 +318,6 @@ Benchmark:
 
 ## License
 
-Copyright © 2014–2021 Nikita Prokopov
+Copyright © 2014–2024 Nikita Prokopov
 
 Licensed under Eclipse Public License (see [LICENSE](LICENSE)).

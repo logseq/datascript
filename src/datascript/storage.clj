@@ -72,6 +72,11 @@
   (let [settings (@#'set/map->settings opts)]
     (StorageAdapter. storage settings)))
 
+(defn maybe-adapt-storage [opts]
+  (if-some [storage (:storage opts)]
+    (update opts :storage make-storage-adapter opts)
+    opts))
+
 (defn storage-adapter ^StorageAdapter [db]
   (when db
     (.-_storage ^PersistentSortedSet (:eavt db))))
@@ -147,7 +152,11 @@
 (defn db-with-tail [db tail]
   (reduce
     (fn [db datoms]
-      (reduce db/with-datom db datoms))
+      (if (empty? datoms)
+        db
+        (as-> db %
+          (reduce db/with-datom % datoms)
+          (assoc % :max-tx (:tx (first datoms))))))
     db tail))
 
 (defn restore

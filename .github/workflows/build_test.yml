@@ -15,16 +15,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Choose Java 11
         run: |
           echo "JAVA_HOME=$JAVA_HOME_11_X64" >> $GITHUB_ENV
           echo "$JAVA_HOME_11_X64/bin" >> $GITHUB_PATH
-      - name: Set up Clojure
-        uses: DeLaGuardo/setup-clojure@12.1
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@12.5
         with:
-          cli: 1.11.1.1413
-
+          cli: latest
       - run: ./script/test_clj.sh
       - run: clojure -M:shadow-cljs:test compile test && node target/datascript.js
       # - run: ./script/test_js.sh

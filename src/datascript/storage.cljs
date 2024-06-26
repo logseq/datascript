@@ -163,11 +163,15 @@
 (defn db-with-tail [db tail]
   (reduce
    (fn [db datoms]
-     (reduce (fn [db datom]
-               (try (db/with-datom db datom)
-                    (catch :default e
-                      (js/console.error e)
-                      db))) db datoms))
+     (if (empty? datoms)
+       db
+       (try
+         (as-> db %
+           (reduce db/with-datom % datoms)
+           (assoc % :max-tx (:tx (first datoms))))
+         (catch :default e
+           (js/console.error e)
+           db))))
    db tail))
 
 (defn restore
@@ -176,3 +180,8 @@
   ([storage opts]
    (let [[db tail] (restore-impl storage opts)]
      (db-with-tail db tail))))
+
+(defn maybe-adapt-storage [opts]
+  (if-some [storage (:storage opts)]
+    (update opts :storage make-storage-adapter opts)
+    opts))

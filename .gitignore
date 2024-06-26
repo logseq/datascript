@@ -29,3 +29,4 @@ web/target-cljs
 .rebl
 .shadow-cljs
 demos/node_storage/target
+.clj-kondo

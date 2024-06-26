@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [filter])
   (:require
     [#?(:cljs cljs.reader :clj clojure.edn) :as edn]
+    [datascript.conn :as conn]
     [datascript.db :as db #?@(:cljs [:refer [Datom DB FilteredDB]])]
     #?(:clj [datascript.pprint])
     [datascript.pull-api :as dp]
@@ -17,8 +18,8 @@
        [datascript.impl.entity Entity]
        [java.util UUID])))
 
-(def ^:const ^:no-doc tx0 db/tx0)
-
+(def ^:const ^:no-doc tx0
+  db/tx0)
 
 ; Entities
 
@@ -146,11 +147,6 @@
 
 ; Creating DB
 
-(defn- maybe-adapt-storage [opts]
-  (if-some [storage (:storage opts)]
-    (update opts :storage storage/make-storage-adapter opts)
-    opts))
-
 (defn ^DB empty-db
   "Creates an empty database with an optional schema.
 
@@ -176,7 +172,7 @@
   ([schema]
    (db/empty-db schema {}))
   ([schema opts]
-   (db/empty-db schema (maybe-adapt-storage opts))))
+   (db/empty-db schema (storage/maybe-adapt-storage opts))))
 
 (def ^{:arglists '([x])
        :doc "Returns `true` if the given value is an immutable database, `false` otherwise."}
@@ -205,7 +201,7 @@
   ([datoms schema]
    (db/init-db datoms schema {}))
   ([datoms schema opts]
-   (db/init-db datoms schema (maybe-adapt-storage opts))))
+   (db/init-db datoms schema (storage/maybe-adapt-storage opts))))
 
 (def ^{:arglists '([db] [db opts])
        :doc "Converts db into a data structure (not string!) that can be fed to serializer
@@ -268,20 +264,13 @@
 
 ; Changing DB
 
-(defn with
+(def ^{:arglists '([db tx-data] [db tx-data tx-meta])} with
   "Same as [[transact!]], but applies to an immutable database value. Returns transaction report (see [[transact!]])."
-  ([db tx-data] (with db tx-data nil))
-  ([db tx-data tx-meta]
-   {:pre [(db/db? db)]}
-   (if (is-filtered db)
-     (throw (ex-info "Filtered DB cannot be modified" {:error :transaction/filtered}))
-     (db/transact-tx-data (db/->TxReport db db [] {} tx-meta) tx-data))))
+  conn/with)
 
-(defn ^DB db-with
+(def ^{:arglists '([db tx-data]) :tag DB} db-with
   "Applies transaction to an immutable db value, returning new immutable db value. Same as `(:db-after (with db tx-data))`."
-  [db tx-data]
-  {:pre [(db/db? db)]}
-  (:db-after (with db tx-data)))
+  conn/db-with)
 
 (defn ^DB with-schema
   "Warning! No validation or conversion. Only change schema in a compatible way"
@@ -448,40 +437,21 @@
   {:pre [(db/db? db)]}
   (db/-index-range db attr start end))
 
-
 ;; Conn
 
-(defn conn?
+(def ^{:arglists '([conn])} conn?
   "Returns `true` if this is a connection to a DataScript db, `false` otherwise."
-  [conn]
-  (and #?(:clj  (instance? clojure.lang.IDeref conn)
-          :cljs (satisfies? cljs.core/IDeref conn))
-    (db/db? @conn)))
+  conn/conn?)
 
-(defn conn-from-db
+(def ^{:arglists '([db])} conn-from-db
   "Creates a mutable reference to a given immutable database. See [[create-conn]]."
-  [db]
-  {:pre [(db/db? db)]}
-  (if-some [storage (storage/storage db)]
-    (do
-      (storage/store db)
-      (atom db
-        :meta {:listeners      (atom {})
-               :tx-tail        (atom [])
-               :db-last-stored (atom db)}))
-    (atom db
-      :meta {:listeners (atom {})})))
+  conn/conn-from-db)
 
-(defn conn-from-datoms
+(def ^{:arglists '([datoms] [datoms schema] [datoms schema opts])} conn-from-datoms
   "Creates an empty DB and a mutable reference to it. See [[create-conn]]."
-  ([datoms]
-   (conn-from-db (init-db datoms)))
-  ([datoms schema]
-   (conn-from-db (init-db datoms schema)))
-  ([datoms schema opts]
-   (conn-from-db (init-db datoms schema opts))))
+  conn/conn-from-datoms)
 
-(defn create-conn
+(def ^{:arglists '([] [schema] [schema opts])} create-conn
   "Creates a mutable reference (a “connection”) to an empty immutable database.
 
    Connections are lightweight in-memory structures (~atoms) with direct support of transaction listeners ([[listen!]], [[unlisten!]]) and other handy DataScript APIs ([[transact!]], [[reset-conn!]], [[db]]).
@@ -491,62 +461,23 @@
    For list of options, see [[empty-db]].
 
    If you specify `:storage` option, conn will be stored automatically after each transaction"
-  ([]
-   (conn-from-db (empty-db)))
-  ([schema]
-   (conn-from-db (empty-db schema)))
-  ([schema opts]
-   (conn-from-db (empty-db schema opts))))
+  conn/create-conn)
 
-(defn restore-conn
+(def ^{:arglists '([storage] [storage opts])} restore-conn
   "Lazy-load database from storage and make conn out of it.
-      Returns nil if there’s no database yet in storage"
-  ([storage]
-   (restore-conn storage {}))
-  ([storage opts]
-   (when-some [[db tail] (storage/restore-impl storage opts)]
-     (atom (storage/db-with-tail db tail)
-           :meta {:listeners      (atom {})
-                  :tx-tail        (atom tail)
-                  :db-last-stored (atom db)}))))
+   Returns nil if there’s no database yet in storage"
+  conn/restore-conn)
 
-(defn ^:no-doc -transact! [conn tx-data tx-meta]
-  {:pre [(conn? conn)]}
-  (let [*report (atom nil)
-        skip-store? (:skip-store? tx-meta)
-        tx-meta' (dissoc tx-meta :skip-store?)]
-    (swap! conn
-           (fn [db]
-             (let [r (with db tx-data tx-meta')]
-               (reset! *report r)
-               (:db-after r))))
-    (when-some [storage (storage/storage @conn)]
-      (let [{db     :db-after
-             datoms :tx-data} @*report
-            settings (set/settings (:eavt db))
-            *tx-tail (:tx-tail (meta conn))
-            tx-tail' (swap! *tx-tail conj datoms)]
-        (when-not skip-store?
-          (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
-             ;; overflow tail
-            (do
-              (storage/store-impl! db (storage/storage-adapter db) false)
-              (reset! *tx-tail [])
-              (reset! (:db-last-stored (meta conn)) db))
-             ;; just update tail
-            (storage/store-tail db tx-tail')))))
-    @*report))
-
-(defn transact!
+(def ^{:arglists '([conn tx-data] [conn tx-data tx-meta])} transact!
   "Applies transaction the underlying database value and atomically updates connection reference to point to the result of that transaction, new db value.
 
    Returns transaction report, a map:
 
-       { :db-before ...       ; db value before transaction
-         :db-after  ...       ; db value after transaction
-         :tx-data   [...]     ; plain datoms that were added/retracted from db-before
-         :tempids   {...}     ; map of tempid from tx-data => assigned entid in db-after
-         :tx-meta   tx-meta } ; the exact value you passed as `tx-meta`
+       {:db-before ...      ; db value before transaction
+        :db-after  ...      ; db value after transaction
+        :tx-data   [...]    ; plain datoms that were added/retracted from db-before
+        :tempids   {...}    ; map of tempid from tx-data => assigned entid in db-after
+        :tx-meta   tx-meta} ; the exact value you passed as `tx-meta`
 
   Note! `conn` will be updated in-place and is not returned from [[transact!]].
 
@@ -622,73 +553,27 @@
       ; equivalent to
       (transact! conn [[:db/add  -1 :name   \"Oleg\"]
                        [:db/add 296 :friend -1]])"
-  ([conn tx-data] (transact! conn tx-data nil))
-  ([conn tx-data tx-meta]
-   {:pre [(conn? conn)]}
-   (let [report (-transact! conn tx-data tx-meta)]
-     (doseq [[_ callback] (some-> (:listeners (meta conn)) (deref))]
-       (callback report))
-     report)))
+  conn/transact!)
 
-(defn reset-conn!
+(def ^{:arglists '([conn db] [conn db tx-meta])} reset-conn!
   "Forces underlying `conn` value to become `db`. Will generate a tx-report that will remove everything from old value and insert everything from the new one."
-  ([conn db]
-   (reset-conn! conn db nil))
-  ([conn db tx-meta]
-   {:pre [(conn? conn)
-          (db/db? db)]}
-   (let [db-before @conn
-         report    (db/map->TxReport
-                    {:db-before db-before
-                     :db-after  db
-                     :tx-data   (concat
-                                 (map #(assoc % :added false) (datoms db-before :eavt))
-                                 (datoms db :eavt))
-                     :tx-meta   tx-meta})]
-     (when-some [storage (storage/storage db-before)]
-       (storage/store db)
-       (reset! (:tx-tail (meta conn)) [])
-       (reset! (:db-last-stored (meta conn)) db))
-     (reset! conn db)
-     (doseq [[_ callback] (some-> (:listeners (meta conn)) (deref))]
-       (callback report))
-     db)))
+  conn/reset-conn!)
 
-(defn reset-schema! [conn schema]
-  "Warning! Does not perform any validation or data conversion. Only change schema in a compatible way"
-  {:pre [(conn? conn)]}
-  (let [db (swap! conn db/with-schema schema)]
-    (when-some [storage (storage/storage @conn)]
-      (storage/store-impl! db (storage/storage-adapter db) true)
-      (reset! (:tx-tail (meta conn)) [])
-      (reset! (:db-last-stored (meta conn)) db))
-    db))
+(def ^{:arglists '([conn schema])} reset-schema!
+  conn/reset-schema!)
 
-(defn- atom? [a]
-  #?(:cljs (instance? Atom a)
-     :clj  (instance? clojure.lang.IAtom a)))
-
-(defn listen!
+(def ^{:arglists '([conn callback] [conn key callback])} listen!
   "Listen for changes on the given connection. Whenever a transaction is applied to the database via [[transact!]], the callback is called
    with the transaction report. `key` is any opaque unique value.
 
    Idempotent. Calling [[listen!]] with the same key twice will override old callback with the new value.
 
    Returns the key under which this listener is registered. See also [[unlisten!]]."
-  ([conn callback]
-   (listen! conn (rand) callback))
-  ([conn key callback]
-   {:pre [(conn? conn)
-          (atom? (:listeners (meta conn)))]}
-   (swap! (:listeners (meta conn)) assoc key callback)
-   key))
+  conn/listen!)
 
-(defn unlisten!
+(def ^{:arglists '([conn key])} unlisten!
   "Removes registered listener from connection. See also [[listen!]]."
-  [conn key]
-  {:pre [(conn? conn)
-         (atom? (:listeners (meta conn)))]}
-  (swap! (:listeners (meta conn)) dissoc key))
+  conn/unlisten!)
 
 
 ; Data Readers

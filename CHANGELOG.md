@@ -1,3 +1,50 @@
+# 1.7.1 - Jun 20, 2024
+
+- Regression: :db.fn/call returning entity without :db/id #474 #475 via @DerGuteMoritz
+
+# 1.7.0 - Jun 19, 2024
+
+- Stable sorting of sequences of various types #470
+- Correctly restore `:max-tx` from storage
+- Fixed tempid/upsert resolution when multiple tempids are added first #472
+- Allow upsert by implicit tuple when only tuple components are specified #473
+- Allow lookup-refs inside tuples used for lookup-refs #452
+
+# 1.6.5 - May 3, 2024
+
+- Regression: fixed some OR queries broken in 1.6.4 #468 #469
+
+# 1.6.4
+
+- Implement “constant substitution” optimization for queries #462
+- Fixed :max-eid for dangling entities during reader-based serialization #463
+- Fixed tempid in unique refs #464
+- Pass through BigInteger/BigDeciman to freeze-fn in serializable #465 #466
+
+# 1.6.3
+
+- Fix regression in 1.6.2 #460 via @galdre
+
+# 1.6.2
+
+- Query: shortcircuit clause resolution when result is guaranteed to be empty #459 via @galdre
+
+# 1.6.1
+
+- Fixed JS version bug caused by Conn rewrite
+
+# 1.6.0
+
+- [ BREAKING ] Implement Conn as a single atom with extend-clj
+  - Only breaking if you relied on getting listneres from Conn meta
+  - Before: `@(:listeners (meta conn))`
+  - After: `(:listeners @(:atom conn))`
+- prevent explosion of redundant tuples during rule solving #457, thx @RutledgePaulV
+
+# 1.5.4
+
+- Fixed: `:xform` is not called on ref attributes #455
+
 # 1.5.3
 
 - Added: `d/reset-schema!`, `d/with-schema`

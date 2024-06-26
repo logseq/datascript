@@ -6,17 +6,21 @@
     [cognitect.transit :as transit]
     [datascript.core :as d]
     [datascript.storage :as storage]
-    [datascript.test.core :as tdc]))
+    [datascript.test.core :as tdc])
+  (:import
+    [java.util.concurrent Executors]))
 
 (defrecord Storage [*disk *reads *writes *deletes]
   storage/IStorage
   (-store [_ addr+data-seq]
     (doseq [[addr data] addr+data-seq]
       (vswap! *disk assoc addr (pr-str data))
-      (vswap! *writes conj addr)))
+      (when *writes
+        (vswap! *writes conj addr))))
   
   (-restore [_ addr]
-    (vswap! *reads conj addr)
+    (when *reads
+      (vswap! *reads conj addr))
     (-> @*disk (get addr) edn/read-string))
 
   (-list-addresses [_]
@@ -25,14 +29,18 @@
   (-delete [_ addrs-seq]
     (doseq [addr addrs-seq]
       (vswap! *disk dissoc addr)
-      (vswap! *deletes conj addr))))
+      (when *deletes
+        (vswap! *deletes conj addr)))))
 
 (defn make-storage [& [opts]]
   (map->Storage
     {:*disk    (volatile! {})
-     :*reads   (volatile! [])
-     :*writes  (volatile! [])
-     :*deletes (volatile! [])}))  
+     :*reads   (when (:stats opts)
+                 (volatile! []))
+     :*writes  (when (:stats opts)
+                 (volatile! []))
+     :*deletes (when (:stats opts)
+                 (volatile! []))}))
 
 (defn reset-stats [storage]
   (vreset! (:*reads storage) [])
@@ -53,7 +61,7 @@
 (deftest test-basics
   (testing "empty db"
     (let [db      (d/empty-db)
-          storage (make-storage)]
+          storage (make-storage {:stats true})]
       (d/store db storage)
       (is (= 5 (count @(:*writes storage))))
       (let [db' (d/restore storage)]
@@ -63,7 +71,7 @@
   
   (testing "small db"
     (let [db      (small-db)
-          storage (make-storage)]
+          storage (make-storage {:stats true})]
       (testing "store"
         (d/store db storage)
         (is (= 0 (count @(:*reads storage))))
@@ -90,7 +98,7 @@
   
   (testing "large db"
     (let [db      (large-db)
-          storage (make-storage)]
+          storage (make-storage {:stats true})]
     
       (testing "store"
         (d/store db storage)
@@ -197,7 +205,7 @@
                 (is (= (:avet db) (:avet db')))))))))))
 
 (deftest test-gc
-  (let [storage (make-storage)]
+  (let [storage (make-storage {:stats true})]
     (let [db (large-db {:storage storage})]
       (d/store db)
       (is (= 135 (count (d/addresses db))))
@@ -228,7 +236,7 @@
       (is (pos? (count (storage/-list-addresses storage)))))))
 
 (deftest test-conn
-  (let [storage (make-storage)
+  (let [storage (make-storage {:stats true})
         conn    (d/create-conn nil {:storage          storage
                                     :branching-factor 32
                                     :ref-type         :strong})]
@@ -242,15 +250,15 @@
     (d/transact! conn [[:db/add 2 :name "Oleg"]])
     (is (= 7 (count @(:*writes storage))))
     (is (= @#'storage/tail-addr (last @(:*writes storage))))
-    (is (= 2 (count @(:tx-tail (meta conn)))))
-    (is (= 2 (count (apply concat @(:tx-tail (meta conn))))))
+    (is (= 2 (count (:tx-tail @(:atom conn)))))
+    (is (= 2 (count (apply concat (:tx-tail @(:atom conn))))))
     
     ;; bigger tx, still writing tail
     (d/transact! conn (mapv #(vector :db/add % :name (str %)) (range 3 33)))
     (is (= 8 (count @(:*writes storage))))
     (is (= @#'storage/tail-addr (last @(:*writes storage))))
-    (is (= 3 (count @(:tx-tail (meta conn)))))
-    (is (= 32 (count (apply concat @(:tx-tail (meta conn))))))
+    (is (= 3 (count (:tx-tail @(:atom conn)))))
+    (is (= 32 (count (apply concat (:tx-tail @(:atom conn))))))
     
     ;; tail overflows, flush db
     (d/transact! conn [[:db/add 33 :name "Petr"]])
@@ -264,6 +272,8 @@
     ;; restore conn with tail
     (let [conn' (d/restore-conn storage)]
       (is (= @conn @conn'))
+      (is (= (:max-eid @conn) (:max-eid @conn')))
+      (is (= (:max-tx @conn) (:max-tx @conn')))
       
       ;; transact keeps working on restored conn
       (d/transact! conn' [[:db/add 35 :name "Vera"]])
@@ -285,18 +295,84 @@
         
         ;; gc on conn
         (is (> (count (storage/-list-addresses storage))
-              (count (d/addresses @(:db-last-stored (meta conn''))))))
+              (count (d/addresses (:db-last-stored @(:atom conn''))))))
         
         (d/collect-garbage storage)
         (is (= (count (storage/-list-addresses storage))
-              (count (d/addresses @(:db-last-stored (meta conn''))))))
+              (count (d/addresses (:db-last-stored @(:atom conn''))))))
         
         (let [conn''' (d/restore-conn storage)]
           (is (= @conn'' @conn''')))))))
 
+(defn stress-test [{:keys [time branching-factor ref-type]
+                    :or {time             10000
+                         branching-factor 32
+                         ref-type         :weak}}]
+  (println "Stress-testing storage for" time "ms")
+  (let [storage    (make-storage {:stats false})
+        conn       (d/create-conn
+                     {:idx  {:db/index true}
+                      :name {:db/index true}}
+                     {:storage          storage
+                      :branching-factor branching-factor
+                      :ref-type         ref-type})
+        threads    (.availableProcessors (Runtime/getRuntime))
+        exec       (Executors/newFixedThreadPool (+ 2 threads))
+        *running?  (volatile! true)
+        bump       (fn [db]
+                     (let [op (:op (d/entity db 1))]
+                       [[:db/add 1 :op (inc (or op 0))]]))
+        *exception (volatile! nil)]
+    ;; transact threads
+    (dotimes [_ threads]
+      (.submit exec ^Runnable
+        (fn []
+          (try
+            (let [i (+ 2 (rand-int 100000))]
+              (d/transact! conn
+                [[:db.fn/call bump]
+                 {:db/id i
+                  :idx   i
+                  :name  (str i)}]))
+            (catch Exception e
+              (vreset! *exception e)
+              (.printStackTrace e)))
+          (when @*running?
+            (recur)))))
+    ;; JVM GC thread
+    (.submit exec ^Runnable
+      (fn []
+        (Thread/sleep (long (rand-int 100)))
+        (System/gc)
+        (when @*running?
+          (recur))))
+    ;; Storage GC
+    (.submit exec ^Runnable
+      (fn []
+        (Thread/sleep 1000)
+        (d/collect-garbage storage)
+        (when @*running?
+          (recur))))
+    (Thread/sleep (long time))
+    (vreset! *running? false)
+    (.shutdown exec)
+    (println "  ops:" (:op (d/entity @conn 1)))
+    (println "  nodes:" (count @(:*disk storage)))
+    (println "  max idx:" (->> (d/datoms @conn :avet :idx) (rseq) (first) :v))
+    (println "  max name:" (->> (d/datoms @conn :avet :name) (rseq) (first) :v))
+    @*exception))
 
-; (t/test-ns *ns*)
-; (t/run-test-var #'test-conn)
+(defn -main [& {:as opts}]
+  (let [opts' {:time             (some-> (opts "--time") Long/parseLong)
+               :branching-factor (some-> (opts "--branching-factor") Long/parseLong)
+               :ref-type         (some-> (opts "--ref-type") keyword)}]
+    (when (stress-test opts')
+      (System/exit 1))))
+
+(comment
+  (t/test-ns *ns*)
+  (stress-test {:time 60000})
+  (t/run-test-var #'test-conn))
 
 (comment  
   (let [serializable (with-open [is (io/input-stream (io/file "/Users/tonsky/ws/roam/db_3M.json_transit"))]
