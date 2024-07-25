@@ -1,3 +1,11 @@
+# 1.7.3 - Jul 22, 2024
+
+- Fixed `find-datom` on empty DB #477 thx @RCmerci
+
+# 1.7.2 - Jul 4, 2024
+
+- Regression: transacting many ref value as a set of inline maps #476 
+
 # 1.7.1 - Jun 20, 2024
 
 - Regression: :db.fn/call returning entity without :db/id #474 #475 via @DerGuteMoritz
