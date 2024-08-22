@@ -53,15 +53,15 @@
       (vswap! *store-buffer* conj! [addr data])
       addr))
   (restore [_ addr]
-    (let [{:keys [keys addresses]} (-restore storage addr)]
-      (when keys
-        (let [keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
-                         (arrays/into-array))
-              opts {:address addr :dirty false}]
-          (if addresses
-            (let [children (arrays/make-array (count addresses))]
-              (set/new-node keys' children addresses opts))
-            (set/new-leaf keys' opts))))))
+    (when addr
+      (let [{:keys [keys addresses]} (-restore storage addr)]
+        (when keys
+          (let [keys' (->> (map (fn [[e a v tx]] (db/datom e a v tx)) keys)
+                           (arrays/into-array))]
+            (if addresses
+              (let [children (arrays/make-array (count addresses))]
+                (set/new-node keys' children addresses addr false))
+              (set/new-leaf keys' addr false)))))))
   (accessed [_ _addr]
     ;; TODO:
     nil)
