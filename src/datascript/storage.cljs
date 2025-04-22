@@ -1,6 +1,6 @@
 (ns datascript.storage
   (:require
-   [datascript.db :as db :refer [Datom]]
+   [datascript.db :as db :refer [Datom DB]]
    [datascript.util :as util]
    [me.tonsky.persistent-sorted-set.protocol :as set-protocol]
    [me.tonsky.persistent-sorted-set :as set :refer [BTSet Node Leaf]]
