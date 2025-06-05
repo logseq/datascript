@@ -158,7 +158,15 @@
                       :max-eid max-eid
                       :max-tx  max-tx})]
         (remember-db db)
-        [db (mapv #(mapv (fn [[e a v tx]] (db/datom e a v tx)) %)
+        [db (mapv #(keep (fn [[e a v tx]]
+                           ;; TODO: do we still need this?
+                           ;; fix unique constraint
+                           (let [datoms (db/-datoms db :eavt e a v nil)
+                                 datom-exists? (some (fn [datom] (= tx (:tx datom))) datoms)
+                                 ;; retracted tx < 0
+                                 added? (> tx 0)]
+                             (when-not (and datom-exists? added?)
+                               (db/datom e a v tx))))%)
                   tail)]))))
 
 (defn db-with-tail [db tail]
