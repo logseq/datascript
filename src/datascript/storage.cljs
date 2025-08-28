@@ -86,7 +86,7 @@
   (atom []))
 
 (defn- remember-db [db]
-  (swap! stored-dbs conj db))
+  (swap! stored-dbs conj (js/WeakRef. db)))
 
 (defn store-impl! [db adapter force?]
   (locking (:storage adapter)
