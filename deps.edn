@@ -1,6 +1,5 @@
 {:deps
- {org.clojars.tiensonqin/persistent-sorted-set {:mvn/version "0.0.8"}
-  ;; org.clojars.tiensonqin/persistent-sorted-set {:local/root "../persistent-sorted-set"}
+ {org.clojars.tiensonqin/persistent-sorted-set {:mvn/version "0.1.1"}
   io.github.tonsky/extend-clj {:mvn/version "0.1.0"}}
 
  :aliases
