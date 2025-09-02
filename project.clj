@@ -8,7 +8,7 @@
 
   :dependencies [[org.clojure/clojure         "1.10.2"   :scope "provided"]
                  [org.clojure/clojurescript   "1.10.844" :scope "provided"]
-                 [org.clojars.tiensonqin/persistent-sorted-set "0.0.6"]
+                 [org.clojars.tiensonqin/persistent-sorted-set "0.1.2"]
                  [io.github.tonsky/extend-clj "0.1.0"]]
 
   :plugins [[lein-cljsbuild "1.1.7"]]
