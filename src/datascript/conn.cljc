@@ -79,33 +79,42 @@
        :tx-tail tail
        :db-last-stored db}))))
 
+(defn ^:no-doc store-after-transact!
+  [conn tx-report]
+  (when-some [storage (storage/storage @conn)]
+    (let [{db     :db-after
+           datoms :tx-data} tx-report
+          settings (set/settings (:eavt db))
+          *atom    (:atom conn)
+          tx-tail' (:tx-tail (swap! *atom update :tx-tail conj datoms))]
+      (when-not (get-in tx-report [:tx-meta :skip-store?])
+        (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
+          ;; overflow tail
+          (do
+            (storage/store-impl! db (storage/storage-adapter db) false)
+            (swap! *atom assoc
+                   :tx-tail []
+                   :db-last-stored db))
+          ;; just update tail
+          (storage/store-tail db tx-tail'))))))
+
 (defn ^:no-doc -transact! [conn tx-data tx-meta]
   {:pre [(conn? conn)]}
   (let [*report (volatile! nil)
-        skip-store? (:skip-store? tx-meta)
         tx-meta' (dissoc tx-meta :skip-store?)]
     (swap! conn
            (fn [db]
              (let [r (with db tx-data tx-meta')]
                (vreset! *report r)
                (:db-after r))))
-    (when-some [storage (storage/storage @conn)]
-      (let [{db     :db-after
-             datoms :tx-data} @*report
-            settings (set/settings (:eavt db))
-            *atom    (:atom conn)
-            tx-tail' (:tx-tail (swap! *atom update :tx-tail conj datoms))]
-        (when-not skip-store?
-          (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
-             ;; overflow tail
-            (do
-              (storage/store-impl! db (storage/storage-adapter db) false)
-              (swap! *atom assoc
-                     :tx-tail []
-                     :db-last-stored db))
-             ;; just update tail
-            (storage/store-tail db tx-tail')))))
-    @*report))
+    (let [tx-report @*report]
+      (store-after-transact! conn tx-report)
+      @*report)))
+
+(defn ^:no-doc run-callbacks
+  [conn report]
+  (doseq [[_ callback] (:listeners @(:atom conn))]
+    (callback report)))
 
 (defn transact!
   ([conn tx-data]
@@ -114,8 +123,7 @@
    {:pre [(conn? conn)]}
    (locking conn
      (let [report (-transact! conn tx-data tx-meta)]
-       (doseq [[_ callback] (:listeners @(:atom conn))]
-         (callback report))
+       (run-callbacks conn report)
        report))))
 
 (defn reset-conn!
@@ -141,8 +149,7 @@
            :tx-tail []
            :db-last-stored db))
        (reset! conn db))
-     (doseq [[_ callback] (:listeners @(:atom conn))]
-       (callback report))
+     (run-callbacks conn report)
      db)))
 
 (defn reset-schema! [conn schema]
