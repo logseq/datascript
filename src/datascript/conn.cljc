@@ -81,22 +81,23 @@
 
 (defn ^:no-doc store-after-transact!
   [conn tx-report]
-  (when-some [storage (storage/storage @conn)]
-    (let [{db     :db-after
-           datoms :tx-data} tx-report
-          settings (set/settings (:eavt db))
-          *atom    (:atom conn)
-          tx-tail' (:tx-tail (swap! *atom update :tx-tail conj datoms))]
-      (when-not (get-in tx-report [:tx-meta :skip-store?])
-        (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
-          ;; overflow tail
-          (do
-            (storage/store-impl! db (storage/storage-adapter db) false)
-            (swap! *atom assoc
-                   :tx-tail []
-                   :db-last-stored db))
-          ;; just update tail
-          (storage/store-tail db tx-tail'))))))
+  (when-not (:skip-store? @conn)
+    (when-some [storage (storage/storage @conn)]
+      (let [{db     :db-after
+             datoms :tx-data} tx-report
+            settings (set/settings (:eavt db))
+            *atom    (:atom conn)
+            tx-tail' (:tx-tail (swap! *atom update :tx-tail conj datoms))]
+        (when-not (get-in tx-report [:tx-meta :skip-store?])
+          (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
+            ;; overflow tail
+            (do
+              (storage/store-impl! db (storage/storage-adapter db) false)
+              (swap! *atom assoc
+                     :tx-tail []
+                     :db-last-stored db))
+            ;; just update tail
+            (storage/store-tail db tx-tail')))))))
 
 (defn ^:no-doc -transact! [conn tx-data tx-meta]
   {:pre [(conn? conn)]}
