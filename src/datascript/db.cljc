@@ -635,6 +635,10 @@
   (-rseek-datoms [db index c0 c1 c2 c3])
   (-index-range [db attr start end]))
 
+(defprotocol ITransactBackend
+  (-with-datom [db datom]
+    "Apply a single datom to DB, returning updated DB."))
+
 (defn validate-indexed [db index c0 c1 c2 c3]
   (when (= index :avet)
     (when-some [attr c0]
@@ -894,7 +898,11 @@
     {}
     (:db.type/tuple rschema)))
 
-(defn- rschema [schema]
+(defn rschema
+  "Builds a reverse schema (attrs-by-property lookup) from a Datascript schema map.
+
+  Exposed to support alternative storage/index backends."
+  [schema]
   ":db/unique           => #{attr ...}
    :db.unique/identity  => #{attr ...}
    :db.unique/value     => #{attr ...}
@@ -1475,7 +1483,7 @@
 ;; In context of `with-datom` we can use faster comparators which
 ;; do not check for nil (~10-15% performance gain in `transact`)
 
-(defn with-datom [db ^Datom datom]
+(defn- with-datom* [db ^Datom datom]
   (validate-datom db datom)
   (let [indexing? (indexing? db (.-a datom))
         schema? (ds/schema-attr? (.-a datom))]
@@ -1496,6 +1504,23 @@
           true      (assoc :hash (atom 0))
           schema?   (-> (remove-schema datom) update-rschema))
         db))))
+
+(defn with-datom
+  "Apply a single datom to DB, returning updated DB.
+
+  Default implementation updates in-memory indexes. Alternative DB backends can
+  extend [[ITransactBackend]] to persist elsewhere."
+  [db datom]
+  (-with-datom db datom))
+
+(extend-protocol ITransactBackend
+  DB
+  (-with-datom [db datom]
+    (with-datom* db datom))
+
+  FilteredDB
+  (-with-datom [_ _]
+    (throw (ex-info "Filtered DB cannot be modified" {:error :transaction/filtered}))))
 
 (defn- queue-tuple [queue tuple idx db e a v]
   (let [tuple-value  (or (get queue tuple)

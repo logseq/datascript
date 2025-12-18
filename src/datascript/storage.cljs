@@ -76,7 +76,9 @@
 
 (defn storage-adapter ^StorageAdapter [db]
   (when db
-    (.-storage ^BTSet (:eavt db))))
+    (let [eavt (:eavt db)]
+      (when (instance? BTSet eavt)
+        (.-storage ^BTSet eavt)))))
 
 (defn storage [db]
   (when-some [adapter (storage-adapter db)]

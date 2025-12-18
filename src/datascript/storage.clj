@@ -79,7 +79,9 @@
 
 (defn storage-adapter ^StorageAdapter [db]
   (when db
-    (.-_storage ^PersistentSortedSet (:eavt db))))
+    (let [eavt (:eavt db)]
+      (when (instance? PersistentSortedSet eavt)
+        (.-_storage ^PersistentSortedSet eavt)))))
 
 (defn storage [db]
   (when-some [adapter (storage-adapter db)]
