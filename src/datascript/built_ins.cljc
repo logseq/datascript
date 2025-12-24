@@ -33,7 +33,7 @@
 (defn- and-fn [& args]
   (reduce (fn [a b]
             (if b b (reduced b))) true args))
-            
+
 (defn- or-fn [& args]
   (reduce (fn [a b]
             (if b (reduced b) b)) nil args))
@@ -96,7 +96,8 @@
    '-differ? -differ?, 'get-else -get-else, 'get-some -get-some, 'missing? -missing?, 'ground identity,
    'clojure.string/blank? str/blank?, 'clojure.string/includes? str/includes?,
    'clojure.string/starts-with? str/starts-with?, 'clojure.string/ends-with? str/ends-with?
-   'tuple vector, 'untuple identity})
+   'tuple vector, 'untuple identity,
+   'number? number?, 'integer? integer?, 'string? string?, 'boolean? boolean?})
 
 ;; Aggregates
 
