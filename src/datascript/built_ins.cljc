@@ -97,7 +97,8 @@
    'clojure.string/blank? str/blank?, 'clojure.string/includes? str/includes?,
    'clojure.string/starts-with? str/starts-with?, 'clojure.string/ends-with? str/ends-with?
    'tuple vector, 'untuple identity,
-   'number? number?, 'integer? integer?, 'string? string?, 'boolean? boolean?})
+   'number? number?, 'integer? integer?, 'string? string?, 'boolean? boolean?,
+   'keyword? keyword?})
 
 ;; Aggregates
 
