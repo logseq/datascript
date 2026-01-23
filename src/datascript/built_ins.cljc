@@ -33,7 +33,7 @@
 (defn- and-fn [& args]
   (reduce (fn [a b]
             (if b b (reduced b))) true args))
-            
+
 (defn- or-fn [& args]
   (reduce (fn [a b]
             (if b (reduced b) b)) nil args))
@@ -94,9 +94,18 @@
    'pr-str pr-str, 'print-str print-str, 'println-str println-str, 'prn-str prn-str,
    're-find re-find, 're-matches re-matches, 're-seq re-seq, 're-pattern re-pattern,
    '-differ? -differ?, 'get-else -get-else, 'get-some -get-some, 'missing? -missing?, 'ground identity,
+   'tuple vector, 'untuple identity,
    'clojure.string/blank? str/blank?, 'clojure.string/includes? str/includes?,
    'clojure.string/starts-with? str/starts-with?, 'clojure.string/ends-with? str/ends-with?
-   'tuple vector, 'untuple identity})
+   'clojure.string/lower-case str/lower-case, 'clojure.string/upper-case str/upper-case,
+   'clojure.string/capitalize str/capitalize, 'clojure.string/join str/join,
+   'clojure.string/index-of str/index-of, 'clojure.string/escape str/escape,
+   'clojure.string/last-index-of str/last-index-of, 'clojure.string/replace str/replace,
+   'clojure.string/replace-first str/replace-first, 'clojure.string/reverse str/reverse,
+   'clojure.string/split str/split, 'clojure.string/split-lines str/split-lines,
+   'clojure.string/trim str/trim, 'clojure.string/trim-newline str/trim-newline,
+   'clojure.string/triml str/triml, 'clojure.string/trimr str/trimr,
+   })
 
 ;; Aggregates
 
