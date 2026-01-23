@@ -105,7 +105,6 @@
    'clojure.string/split str/split, 'clojure.string/split-lines str/split-lines,
    'clojure.string/trim str/trim, 'clojure.string/trim-newline str/trim-newline,
    'clojure.string/triml str/triml, 'clojure.string/trimr str/trimr,
-   'tuple vector, 'untuple identity,
    'number? number?, 'integer? integer?, 'string? string?, 'boolean? boolean?,
    'keyword? keyword?})
 
