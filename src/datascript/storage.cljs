@@ -170,18 +170,8 @@
                   tail)]))))
 
 (defn db-with-tail [db tail]
-  (reduce
-   (fn [db datoms]
-     (if (empty? datoms)
-       db
-       (try
-         (as-> db %
-           (reduce db/with-datom % datoms)
-           (assoc % :max-tx (:tx (first datoms))))
-         (catch :default e
-           (js/console.error e)
-           db))))
-   db tail))
+  ;; Ensures old cardinality/one datoms retracted
+  (:db-after (db/transact-tx-data (db/->TxReport db db [] {} {}) (apply concat tail))))
 
 (defn restore
   ([storage]

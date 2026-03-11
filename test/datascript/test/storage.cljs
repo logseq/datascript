@@ -5,6 +5,7 @@
    [clojure.test :as t :refer [is are deftest testing]]
    #_[cognitect.transit :as transit]
    [datascript.core :as d]
+   [datascript.db :as db]
    [datascript.storage :as storage]
    #_[datascript.test.core :as tdc]))
 
@@ -138,6 +139,31 @@
           (d/store db')
           (is (= 8 (count @(:*writes storage))))))) ;; root, tail + 3 leves * 2 indexes
     ))
+
+(deftest test-db-with-tail
+  (testing "db-with-tail retracts stale cardinality/one values when replaying tail datoms"
+    (let [schema {:block/updated-at {:db/index true}}
+          db     (-> (d/empty-db schema)
+                     (d/db-with [[:db/add 1 :block/updated-at 2]]))
+          tail   [[(db/datom 1 :block/updated-at 1772979060646 536870915 true)]
+                  [(db/datom 1 :block/updated-at 1772979061145 536870916 true)]]
+          db'    (storage/db-with-tail db tail)]
+      (is (= [1772979061145]
+             (mapv :v (d/datoms db' :avet :block/updated-at))))))
+
+  (testing "restore replays stored tail without leaving stale cardinality/one values"
+    (let [schema  {:block/updated-at {:db/index true}}
+          storage (make-storage {:stats true})
+          db      (-> (d/empty-db schema {:storage          storage
+                                          :branching-factor 32
+                                          :ref-type         :strong})
+                      (d/db-with [[:db/add 1 :block/updated-at 2]]))
+          tail    [[(db/datom 1 :block/updated-at 1772979060646 536870915 true)]
+                   [(db/datom 1 :block/updated-at 1772979061145 536870916 true)]]]
+      (d/store db)
+      (storage/store-tail db tail)
+      (is (= [1772979061145]
+             (mapv :v (d/datoms (d/restore storage) :avet :block/updated-at)))))))
 
 ;; Commented out test-gc test-file-storage tests and helpers b/c they are not implemented in cljs
 
