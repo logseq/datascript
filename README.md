@@ -218,6 +218,36 @@ Transactions:
 * Use strings such as `":db/id"`, `":db/add"`, etc. instead of db-namespaced keywords
 * Use regular JS arrays and objects to pass data to `transact` and `db_with`
 
+## Agent REPL bridge
+
+For remote CLJS eval from a local agent, this repo includes a small Shadow-backed Node bridge.
+
+Start it in two terminals:
+
+```bash
+clojure -M:shadow-cljs watch agent-repl
+```
+
+```bash
+node target/agent-repl.js
+```
+
+Check readiness:
+
+```bash
+curl -s http://127.0.0.1:8787/health
+```
+
+Eval CLJS:
+
+```bash
+curl -s http://127.0.0.1:8787/eval \
+  -H 'content-type: application/json' \
+  -d '{"code":"(+ 1 2)","ns":"cljs.user"}'
+```
+
+The bridge binds to `127.0.0.1` by default. Override with `CLJS_EVAL_HOST` and `CLJS_EVAL_PORT` if needed.
+
 Transaction reports:
 
 * `report.tempids` has string keys (`"-1"` for entity tempid `-1`), use `resolve_tempid` to set up a correspondence

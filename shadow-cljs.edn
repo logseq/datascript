@@ -7,6 +7,11 @@
    :output-to        "target/datascript.js"
    :compiler-options {:infer-externs true}
    :main node-test-runner/init}
+  :agent-repl
+  {:target    :node-script
+   :output-to "target/agent-repl.js"
+   :main      datascript.agent-repl/main
+   :devtools  {:autoload false}}
   :library
   {:target           :node-library
    :output-to        "target/main.js"
