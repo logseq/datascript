@@ -163,7 +163,29 @@
       (d/store db)
       (storage/store-tail db tail)
       (is (= [1772979061145]
-             (mapv :v (d/datoms (d/restore storage) :avet :block/updated-at)))))))
+             (mapv :v (d/datoms (d/restore storage) :avet :block/updated-at))))))
+
+  (testing "restore drops tail groups rejected by unique constraints"
+    (let [schema  {:block/uuid  {:db/unique :db.unique/identity}
+                   :block/title {}}
+          storage (make-storage {:stats true})
+          db      (-> (d/empty-db schema {:storage          storage
+                                          :branching-factor 32
+                                          :ref-type         :strong})
+                      (d/db-with [[:db/add 1 :block/uuid "u1"]]))
+          tail    [[(db/datom 2 :block/uuid "u1" 536870915 true)
+                    (db/datom 2 :block/title "Title" 536870915 true)]
+                   [(db/datom 3 :block/title "Later" 536870916 true)]]]
+      (d/store db)
+      (storage/store-tail db tail)
+      (let [db' (d/restore storage)]
+        (is (= [1]
+               (mapv :e (d/datoms db' :avet :block/uuid "u1"))))
+        (is (= []
+               (mapv (juxt :e :a :v) (d/datoms db' :eavt 2))))
+        (is (= [[3 :block/title "Later"]]
+               (mapv (juxt :e :a :v) (d/datoms db' :eavt 3))))
+        (is (= 536870916 (:max-tx db')))))))
 
 ;; Commented out test-gc test-file-storage tests and helpers b/c they are not implemented in cljs
 

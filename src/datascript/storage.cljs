@@ -158,20 +158,25 @@
                       :max-eid max-eid
                       :max-tx  max-tx})]
         (remember-db db)
-        [db (mapv #(keep (fn [[e a v tx]]
-                           ;; TODO: do we still need this?
-                           ;; fix unique constraint
-                           (let [datoms (db/-datoms db :eavt e a v nil)
-                                 datom-exists? (some (fn [datom] (= tx (:tx datom))) datoms)
-                                 ;; retracted tx < 0
-                                 added? (> tx 0)]
-                             (when-not (and datom-exists? added?)
-                               (db/datom e a v tx))))%)
-                  tail)]))))
+        [db (mapv #(mapv (fn [[e a v tx]] (db/datom e a v tx)) %) tail)]))))
+
+(defn- db-with-tail-datoms [db datoms]
+  (try
+    (let [tx  (:tx (first datoms))
+          db' (assoc db :max-tx (dec tx))]
+      (:db-after (db/transact-tx-data (db/->TxReport db' db' [] {} {}) datoms)))
+    (catch :default _
+      db)))
 
 (defn db-with-tail [db tail]
-  ;; Ensures old cardinality/one datoms retracted
-  (:db-after (db/transact-tx-data (db/->TxReport db db [] {} {}) (apply concat tail))))
+  (reduce
+   (fn [db datoms]
+     (if (empty? datoms)
+       db
+       (as-> db %
+         (db-with-tail-datoms % datoms)
+         (assoc % :max-tx (:tx (first datoms))))))
+   db tail))
 
 (defn restore
   ([storage]
