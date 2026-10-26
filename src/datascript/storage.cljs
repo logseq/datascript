@@ -39,13 +39,12 @@
 
 (defrecord StorageAdapter [storage]
   set-protocol/IStorage
-  (store [_ ^Node node address]
-    (let [addr (cond
-                 (and address (instance? Node node)
-                      (contains? (set (.-_addresses node)) address))
-                 (gen-addr)
-                 :else
-                 (or address (gen-addr)))
+  (store [_ ^Node node _address]
+    ;; Every stored node gets a fresh address. A changed node carries the address of the node it replaced, and
+    ;; that node still belongs to older db values (a tx-report's :db-before, a db kept by a running task): their
+    ;; children are held through weak references and read back from storage by address once collected, so
+    ;; writing the new node there made an older db value read the newer db's datoms.
+    (let [addr (gen-addr)
           keys (mapv serializable-datom (.-keys node))
           data (cond-> {:keys keys}
                  (instance? Node node)

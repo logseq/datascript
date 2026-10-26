@@ -283,6 +283,26 @@
         (d/collect-garbage storage)
         (is (pos? (count (storage/-list-addresses storage)))))))
 
+(deftest test-store-keeps-older-db-readable
+  (testing "storing a newer db does not rewrite the nodes an older stored db points at"
+    (let [storage (make-storage)
+          db0     (large-db)
+          _       (d/store db0 storage)
+          root0   (-> @(:*disk storage) (get 0))
+          db1     (d/db-with db0 (map #(vector :db/add % :str (str "changed " %)) (range 1 301)))
+          _       (d/store db1)
+          ;; the storage as it is now, read through db0's root record
+          view    (reify storage/IStorage
+                    (-store [_ _ _] nil)
+                    (-restore [_ addr]
+                      (case addr
+                        0 (edn/read-string root0)
+                        1 []
+                        (-> @(:*disk storage) (get addr) edn/read-string))))
+          db0'    (d/restore view)]
+      (is (= (vec (map (juxt :e :a :v) (d/datoms db0 :eavt)))
+             (vec (map (juxt :e :a :v) (d/datoms db0' :eavt))))))))
+
 (deftest test-conn
   (let [storage (make-storage {:stats true})
         conn    (d/create-conn nil {:storage          storage
